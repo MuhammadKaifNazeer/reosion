@@ -72,7 +72,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -117,6 +117,21 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@theme inline {
+  /* brand accent: quiet indigo used sparingly for links and focus */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+}
+
+:root {
+  --brand: oklch(0.62 0.17 264);
+  --brand-foreground: oklch(0.985 0 0);
+}
+
+.dark {
+  --brand: oklch(0.68 0.16 264);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -130,4 +145,22 @@
   html {
     @apply font-sans;
   }
+}
+
+::selection {
+  background: color-mix(in oklab, var(--brand) 35%, transparent);
+}
+
+/* Landing page demo animations (CSS only, no JS) */
+@keyframes reosion-loop-x {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(30%); }
+}
+@keyframes reosion-loop-opacity {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@keyframes reosion-loop-scale {
+  0%, 100% { transform: scale(0.92); }
+  50% { transform: scale(1.06); }
 }

@@ -9,12 +9,11 @@ import type { ProjectStorage } from "@/lib/projects/storage";
 let storage: ProjectStorage;
 
 beforeAll(async () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const shim = (await import("fake-indexeddb")) as unknown as Record<
     string,
     unknown
-  >;
-  const g = globalThis as unknown as Record<string, unknown>;
+  >;  const g = globalThis as unknown as Record<string, unknown>;
   for (const key of [
     "indexedDB",
     "IDBKeyRange",
