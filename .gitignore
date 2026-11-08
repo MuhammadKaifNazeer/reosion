@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# vendored runtime assets (copied from node_modules by scripts/setup-vendor.mjs)
+/public/vendor/
+/public/ffmpeg/
+
+# generated sandbox runtime bundle (built by scripts/build-runtime.mjs)
+/public/runtime.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
