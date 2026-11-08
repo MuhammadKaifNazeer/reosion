@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import Image from "next/image";
 
 export default function Home() {
@@ -62,6 +63,7 @@ export default function Home() {
           >
             Documentation
           </a>
+          <ThemeToggle />
         </div>
       </main>
     </div>
