@@ -1,0 +1,575 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CircleAlert,
+  Code2,
+  Loader2,
+  Save,
+  Scissors,
+  Sparkles,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CodeEditorPane } from "@/components/editor/code-editor-pane";
+import { PreviewRuntime } from "@/components/runtime/preview-runtime";
+import type {
+  CompileStatus,
+  RuntimeStatus,
+} from "@/components/runtime/preview-runtime";
+import { TransportControls } from "@/components/runtime/transport-controls";
+import { useClockDriver } from "@/components/runtime/use-clock-driver";
+import { Timeline } from "@/components/timeline/timeline";
+import { AnimationClockController } from "@/lib/clock/clock";
+import { getStorage } from "@/lib/projects/storage";
+import { STAGE_FILE_NAME } from "@/lib/projects/templates";
+import type { Project } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+/**
+ * The project workspace.
+ *
+ *   ┌────────────────────────────────────────────────────┐
+ *   │ header                                             │
+ *   ├──┬──────────────────────────────┬──────────────────┤
+ *   │r │ code / ai                    │ preview          │
+ *   │a ├──────────────────────────────┤                  │
+ *   │i │                              ├──────────────────┤
+ *   │l │                              │ timeline         │
+ *   └──┴──────────────────────────────┴──────────────────┘
+ *
+ * The clock lives in a controller (never in a global store); only the
+ * transport + timeline subscribe to it.
+ */
+export function WorkspaceScreen({ projectId }: { projectId: string }) {
+  const [project, setProject] = useState<Project | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<"code" | "ai">("code");
+  const [compileStatus, setCompileStatus] = useState<CompileStatus>({
+    kind: "idle",
+  });
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus>({
+    kind: "booting",
+  });
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty">(
+    "saved",
+  );
+  const [errorFocus, setErrorFocus] = useState<{
+    line: number;
+    column: number;
+    token: number;
+  } | null>(null);
+
+  const clock = useMemo<AnimationClockController>(() => {
+    // duration/fps are project settings; recreated only when they change
+    return new AnimationClockController(project?.duration ?? 3, project?.fps ?? 30);
+  }, [project?.duration, project?.fps]);
+  useClockDriver(clock);
+
+  // Load project
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await getStorage().getProject(projectId);
+      if (cancelled) return;
+      if (!loaded) {
+        setMissing(true);
+        return;
+      }
+      setProject(loaded);
+      setCode(loaded.code);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  // Autosave (debounced) — the clock keeps playing while saving.
+  const codeRef = useRef(code);
+  codeRef.current = code;
+  useEffect(() => {
+    if (!project || !code || code === project.code) return;
+    setSaveState("dirty");
+    const handle = window.setTimeout(async () => {
+      setSaveState("saving");
+      const updated = await getStorage().updateProject(project.id, {
+        code: codeRef.current ?? code,
+      });
+      setProject(updated);
+      setSaveState("saved");
+    }, 800);
+    return () => window.clearTimeout(handle);
+    // project intentionally omitted to avoid autosave-after-save loops
+  }, [code]); // eslint-disable-line react-hooks/exhaustive-deps -- see comment
+
+  const saveNow = useCallback(async () => {
+    if (!project || !codeRef.current) return;
+    setSaveState("saving");
+    const updated = await getStorage().updateProject(project.id, {
+      code: codeRef.current,
+    });
+    await getStorage().saveVersion(project.id, {
+      code: codeRef.current,
+      label: "Manual save",
+    });
+    setProject(updated);
+    setSaveState("saved");
+  }, [project]);
+
+  // ---- Keyboard shortcuts -------------------------------------------------
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inTextEntry =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable === true;
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveNow();
+        return;
+      }
+      if (inTextEntry) return; // Space/arrows don't hijack typing
+      if (event.code === "Space") {
+        event.preventDefault();
+        clock.toggle();
+        return;
+      }
+      if (event.metaKey || event.ctrlKey) return;
+      switch (event.key) {
+        case "ArrowLeft":
+          event.preventDefault();
+          clock.stepFrames(-1);
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          clock.stepFrames(1);
+          break;
+        case "j":
+        case "J":
+          clock.stepFrames(-1);
+          break;
+        case "k":
+        case "K":
+          clock.pause();
+          break;
+        case "l":
+        case "L":
+          clock.stepFrames(1);
+          break;
+        case "Escape":
+          if (activeTool === "ai") setActiveTool("code");
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [clock, saveNow, activeTool]);
+
+  // ---- Error panels --------------------------------------------------------
+  useEffect(() => {
+    if (compileStatus.kind !== "errors" || compileStatus.errors.length === 0) {
+      return;
+    }
+    const first = compileStatus.errors[0];
+    if (typeof first.line === "number" && typeof first.column === "number") {
+      setErrorFocus((prev) => ({
+        line: Math.min(first.line!, 100000),
+        column: Math.max(1, first.column! + 1),
+        token: prev ? prev.token + 1 : 1,
+      }));
+    }
+  }, [compileStatus]);
+
+  if (missing) {
+    return <MissingProject />;
+  }
+  if (!project || code === null) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+      </div>
+    );
+  }
+
+  const encoded = encodeURIComponent(projectId);
+  const compileErrors =
+    compileStatus.kind === "errors" ? compileStatus.errors : [];
+
+  return (
+    <div className="flex min-h-dvh flex-col bg-background">
+      {/* header */}
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Back to projects"
+          render={<Link href="/dashboard" />}
+        >
+          <ArrowLeft />
+        </Button>
+        <input
+          className="w-56 rounded-sm bg-transparent px-1.5 py-1 text-sm font-medium outline-none focus:bg-muted/60"
+          value={project.name}
+          aria-label="Project name"
+          onChange={async (e) => {
+            const updated = await getStorage().updateProject(project.id, {
+              name: e.target.value,
+            });
+            setProject(updated);
+          }}
+        />
+        <Badge variant="secondary" className="font-mono text-[10px]">
+          {project.aspectRatio} · {project.width}×{project.height} · {project.fps}
+          fps · {project.duration}s
+        </Badge>
+
+        <SaveIndicator state={saveState} />
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="outline" size="sm" render={<Link href={`/projects/${encoded}/preview`} />}>
+            Preview
+          </Button>
+          <Button size="sm" render={<Link href={`/projects/${encoded}/export`} />}>
+            <Scissors />
+            Export
+          </Button>
+        </div>
+      </header>
+
+      {/* body */}
+      <div className="flex min-h-0 flex-1">
+        {/* icon rail */}
+        <nav
+          className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-border py-2"
+          aria-label="Workspace tools"
+        >
+          <RailButton
+            icon={Code2}
+            label="Code"
+            active={activeTool === "code"}
+            onClick={() => setActiveTool("code")}
+          />
+          <RailButton
+            icon={Sparkles}
+            label="AI"
+            active={activeTool === "ai"}
+            onClick={() => setActiveTool("ai")}
+          />
+        </nav>
+
+        {/* center: code / ai + editor */}
+        <div className="flex min-w-0 flex-1 flex-col border-r border-border">
+          {activeTool === "code" ? (
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div className="flex h-7 shrink-0 items-center gap-2 border-b border-border bg-card px-3 font-mono text-[10px] text-muted-foreground">
+                {STAGE_FILE_NAME}
+                {compileStatus.kind === "compiling" ? (
+                  <span className="flex items-center gap-1">
+                    <Loader2 className="size-3 animate-spin" /> compiling
+                  </span>
+                ) : compileStatus.kind === "ok" ? (
+                  <span className="text-brand">· compiled</span>
+                ) : null}
+              </div>
+              <div className="min-h-0 flex-1">
+                <CodeEditorPane
+                  value={code ?? ""}
+                  onChange={(v) => setCode(v ?? "")}
+                  revealLine={errorFocus}
+                />
+              </div>
+              {compileErrors.length > 0 ? (
+                <div
+                  role="alert"
+                  className="shrink-0 border-t border-destructive/40 bg-destructive/10 px-3 py-2"
+                >
+                  {compileErrors.slice(0, 4).map((error, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="block w-full truncate text-left font-mono text-[11px] text-destructive hover:underline"
+                      onClick={() =>
+                        typeof error.line === "number"
+                          ? setErrorFocus((prev) => ({
+                              line: Math.min(error.line!, 100000),
+                              column: Math.max(1, (error.column ?? 0) + 1),
+                              token: prev ? prev.token + 1 : 1,
+                            }))
+                          : undefined
+                      }
+                    >
+                      {typeof error.line === "number"
+                        ? `L${error.line}:${error.column ?? 1} — `
+                        : ""}
+                      {error.message}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <AiWorkspacePlaceholder onEscape={() => setActiveTool("code")} />
+          )}
+        </div>
+
+        {/* right: preview + timeline */}
+        <div className="flex w-[38%] min-w-[280px] max-w-[46rem] shrink-0 flex-col">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-accent/40 p-4">
+            <StageFitter width={project.width} height={project.height}>
+              {(scale) => (
+                <div
+                  className="relative overflow-hidden shadow-xl shadow-black/40 outline-none ring-border/60 ring-1"
+                  style={{
+                    width: Math.round(project.width * scale),
+                    height: Math.round(project.height * scale),
+                  }}
+                >
+                  {/* The iframe is mounted at TRUE project pixel size; the
+                      transform scales it visually without affecting renders. */}
+                  <div
+                    style={{
+                      width: project.width,
+                      height: project.height,
+                      transform: `scale(${scale})`,
+                      transformOrigin: "top left",
+                    }}
+                  >
+                    <PreviewRuntime
+                      project={project}
+                      clock={clock}
+                      onCompileStatus={setCompileStatus}
+                      onRuntimeStatus={setRuntimeStatus}
+                    />
+                  </div>
+                </div>
+              )}
+            </StageFitter>
+
+            {/* transport overlays the stage bottom */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+              <TransportControls
+                project={project}
+                clock={clock}
+                projectId={projectId}
+              />
+            </div>
+
+            {runtimeStatus.kind === "load_error" ? (
+              <RuntimeErrorCard
+                message={runtimeStatus.message}
+                stack={runtimeStatus.stack}
+                onLocate={(line, column) =>
+                  {
+                    setActiveTool("code");
+                    setErrorFocus((prev) => ({
+                      line: Math.min(line, 100000),
+                      column: Math.max(1, column + 1),
+                      token: prev ? prev.token + 1 : 1,
+                    }));
+                  }
+                }
+                onDismiss={() => setRuntimeStatus({ kind: "ready" })}
+              />
+            ) : null}
+          </div>
+
+          <div className="shrink-0 border-t border-border px-3 py-2">
+            <Timeline clock={clock} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RailButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        delay={400}
+        render={
+          <button
+            type="button"
+            aria-label={label}
+            aria-pressed={active}
+            onClick={onClick}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-md transition-colors",
+              active
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+            )}
+          />
+        }
+      >
+        <Icon className="size-4" />
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SaveIndicator({ state }: { state: "saved" | "saving" | "dirty" }) {
+  return (
+    <span className="ml-auto mr-2 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+      {state === "saving" ? (
+        <>
+          <Loader2 className="size-3 animate-spin" /> saving
+        </>
+      ) : state === "dirty" ? (
+        <>unsaved</>
+      ) : (
+        <>
+          <Save className="size-3" /> saved
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Measures its own box and hands children a scale factor that fits the
+ * project stage inside it.
+ */
+function StageFitter({
+  width,
+  height,
+  children,
+}: {
+  width: number;
+  height: number;
+  children: (scale: number) => React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.25);
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const factor = Math.min(rect.width / width, rect.height / height);
+    setScale(Math.max(0.05, Math.min(factor, 1)));
+  }, [width, height]);
+
+  useEffect(() => {
+    measure();
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  return (
+    <div ref={ref} className="flex h-full w-full items-center justify-center">
+      {children(scale)}
+    </div>
+  );
+}
+
+function RuntimeErrorCard({
+  message,
+  stack,
+  onLocate,
+  onDismiss,
+}: {
+  message: string;
+  stack?: string;
+  onLocate: (line: number, column: number) => void;
+  onDismiss: () => void;
+}) {
+  const location = /(?:at\s+.*?|).*?:(\d+):(\d+)/.exec(stack?.split("\n")[0] ?? "");
+  const line = location ? Number(location[1]) : 1;
+  const column = location ? Number(location[2]) : 1;
+  return (
+    <div
+      role="alert"
+      className="absolute left-4 right-4 top-4 z-20 rounded-md border border-destructive/50 bg-background/95 p-3 shadow-lg"
+    >
+      <div className="flex items-center gap-2">
+        <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />
+        <span className="font-mono text-[11px] font-medium text-destructive">
+          Runtime error
+        </span>
+        <button
+          type="button"
+          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => onLocate(line, column)}
+        >
+          Go to code
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss error"
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
+      </div>
+      <p className="mt-1.5 font-mono text-[11px] leading-5 text-foreground">
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function AiWorkspacePlaceholder({ onEscape }: { onEscape: () => void }) {
+  void onEscape;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
+      <Sparkles className="size-6 text-muted-foreground/50" aria-hidden />
+      <p className="text-sm font-medium text-foreground">AI workspace</p>
+      <p className="max-w-xs text-xs leading-5 text-muted-foreground">
+        The assistant reads your animation code, project settings and runtime
+        errors, then proposes edits as diffs. Bring your own key — AI is
+        optional and everything works without it.
+      </p>
+      <Button variant="outline" size="sm" disabled>
+        Configure provider (soon)
+      </Button>
+    </div>
+  );
+}
+
+function MissingProject() {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 text-center">
+      <CircleAlert className="size-6 text-muted-foreground" aria-hidden />
+      <p className="text-sm text-foreground">This project could not be found.</p>
+      <p className="max-w-xs text-xs text-muted-foreground">
+        It may have been deleted, or it was created in another browser profile
+        (projects are stored locally).
+      </p>
+      <Button size="sm" render={<Link href="/dashboard" />}>
+        Back to projects
+      </Button>
+    </div>
+  );
+}

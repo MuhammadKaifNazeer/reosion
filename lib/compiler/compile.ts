@@ -41,7 +41,10 @@ let compilerReady: Promise<boolean> | null = null;
 async function ensureCompiler(): Promise<boolean> {
   if (!compilerReady) {
     compilerReady = (async () => {
-      const esbuild = await import("esbuild-wasm");
+      // Node entry only on the server (types); in the browser this resolves
+      // to the wasm build. We import the browser entry explicitly since the
+      // module graph here is client-only.
+      const esbuild = await import("esbuild-wasm/esm/browser");
       await esbuild.initialize({
         wasmURL: "/vendor/esbuild/esbuild.wasm",
       });
@@ -80,13 +83,26 @@ export async function compileUserCode(source: string): Promise<CompileResult> {
     };
   }
 
-  const esbuild = await import("esbuild-wasm");
+  const esbuild = await import("esbuild-wasm/esm/browser");
 
   // Namespaced virtual modules injected by the runtime.
-  const stubPlugin: import("esbuild-wasm").Plugin = {
+  const stubPlugin: import("esbuild-wasm/esm/browser").Plugin = {
     name: "reosion-runtime-deps",
     setup(build) {
+      // The entry point itself must route to the virtual user source. It is
+      // registered before the catch-all below (first matching resolver wins).
+      const entryNamespace = (path: string) => {
+        if (path === "entry.tsx" || path === "/entry.tsx") {
+          return { path: "entry.tsx", namespace: "user-src" as const };
+        }
+        return null;
+      };
+      build.onResolve({ filter: /^(\/)?entry\.tsx$/ }, (args) =>
+        entryNamespace(args.path),
+      );
       build.onResolve({ filter: /.*/ }, (args) => {
+        const entry = entryNamespace(args.path);
+        if (entry) return entry;
         // Relative imports resolve to the single-file virtual project.
         if (args.path.startsWith(".") || args.path.startsWith("/")) {
           return null; // let esbuild error naturally (file not found)
@@ -116,10 +132,6 @@ export async function compileUserCode(source: string): Promise<CompileResult> {
       build.onLoad({ filter: /\.tsx$/, namespace: "user-src" }, () => ({
         contents: source,
         loader: "tsx",
-      }));
-      build.onResolve({ filter: /^entry\.tsx$/ }, () => ({
-        path: "entry.tsx",
-        namespace: "user-src",
       }));
     },
   };

@@ -23,9 +23,9 @@ export interface LoadCodeMessage {
   type: "LOAD_CODE";
   /** Compiled module source produced by the local compiler. */
   code: string;
-  /** True when the runtime should present itself at t=0 and pause. */
-  paused: boolean;
-  /** Time to seek to after load (seconds). */
+  /** Project stage the animation renders at. */
+  stage: { width: number; height: number; fps: number; duration: number };
+  /** Optional time to park at after load (seconds). */
   time?: number;
 }
 
