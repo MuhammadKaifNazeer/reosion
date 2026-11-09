@@ -125,6 +125,12 @@ export class AnimationClockController implements AnimationClock {
 
   seek(time: number): void {
     const clamped = Math.max(0, Math.min(this.duration, time));
+    // Seeking exactly to the end stops playback: there is nothing further to
+    // render, and the playhead must rest on the final frame.
+    if (clamped >= this.duration - 1e-6) {
+      this.update({ time: this.duration, playing: false });
+      return;
+    }
     this.update({ time: clamped });
   }
 
@@ -137,13 +143,16 @@ export class AnimationClockController implements AnimationClock {
   }
 
   tick(deltaSeconds: number): boolean {
-    let next = this.state.time + deltaSeconds;
-    // Loop playback; the play/pause state is untouched by tick().
+    if (!this.state.playing) return false;
+    const next = this.state.time + Math.max(0, deltaSeconds);
     if (next >= this.duration) {
-      next = next % this.duration;
+      // Playback ends once: clamp to exactly `duration`, pause, and let the
+      // driver's subscription code stop any further ticking.
+      this.update({ time: this.duration, playing: false });
+      return true;
     }
     this.update({ time: next });
-    return deltaSeconds !== 0 || this.state.playing;
+    return true;
   }
 
   snapshot(): ClockSnapshot {

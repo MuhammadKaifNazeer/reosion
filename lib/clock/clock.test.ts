@@ -33,14 +33,13 @@ describe("AnimationClockController", () => {
     expect(clock.currentFrame).toBe(0);
   });
 
-  it("ticks the time and loops", () => {
+  it("tick advances only while playing", () => {
     const clock = new AnimationClockController(2, 30);
     clock.tick(0.5);
-    expect(clock.time).toBeCloseTo(0.5);
-    clock.tick(2);
-    expect(clock.time).toBeCloseTo(0.5); // 0.5 + 2 -> loop to 0.5
-    clock.tick(0);
-    expect(clock.time).toBeCloseTo(0.5);
+    expect(clock.time).toBe(0); // paused: no-op
+    clock.play();
+    clock.tick(0.5);
+    expect(clock.time).toBeCloseTo(0.5, 5);
   });
 
   it("seek clamps to [0, duration]", () => {
@@ -68,6 +67,56 @@ describe("AnimationClockController", () => {
     clock.play();
     expect(clock.time).toBe(0);
     expect(clock.playing).toBe(true);
+  });
+
+  it("tick stops exactly at the end instead of looping", () => {
+    const clock = new AnimationClockController(1, 30);
+    clock.play();
+    const seen: number[] = [];
+    for (let i = 0; i < 40 && clock.playing; i++) {
+      seen.push(clock.time);
+      clock.tick(0.1);
+    }
+    expect(clock.playing).toBe(false);
+    expect(clock.time).toBe(1);
+    // time never exceeded duration
+    expect(seen.every((t) => t <= 1)).toBe(true);
+    // ticking while paused is a no-op
+    clock.tick(0.5);
+    expect(clock.time).toBe(1);
+  });
+
+  it("playback from a mid position continues and ends at duration", () => {
+    const clock = new AnimationClockController(1, 30);
+    clock.seek(0.5);
+    clock.play();
+    clock.tick(0.25);
+    expect(clock.time).toBeCloseTo(0.75, 5);
+    expect(clock.playing).toBe(true);
+    clock.tick(0.25); // crosses the end -> clamp + pause
+    expect(clock.time).toBe(1);
+    expect(clock.playing).toBe(false);
+    clock.tick(0.25); // nothing further
+    expect(clock.time).toBe(1);
+  });
+
+  it("seek clamps to [0, duration] and pauses at the end", () => {
+    const clock = new AnimationClockController(1, 30);
+    clock.play();
+    clock.seek(-2);
+    expect(clock.time).toBe(0);
+    clock.seek(5);
+    expect(clock.time).toBe(1);
+    expect(clock.playing).toBe(false);
+  });
+
+  it("currentFrame stays inside the last frame at the end", () => {
+    const clock = new AnimationClockController(1, 30);
+    clock.seek(1); // exactly duration
+    expect(clock.currentFrame).toBe(29); // not 30
+    const clockTwo = new AnimationClockController(30, DEFAULT_FPS);
+    clockTwo.seek(30);
+    expect(clockTwo.currentFrame).toBe(899);
   });
 
   it("notifies subscribers on changes and snapshots are stable between them", () => {

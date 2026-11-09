@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import {
   AnimationClockController,
   formatTimecode,
+  timeToFrame,
 } from "@/lib/clock/clock";
 import type { Project } from "@/lib/types";
 
@@ -39,7 +40,7 @@ export function TransportControls({
     clock.subscribe.bind(clock),
     clock.snapshot.bind(clock),
   );
-  const frame = Math.floor(timeToFrames(snapshot.time, project.fps));
+  const frame = timeToFrame(snapshot.time, project.fps, project.duration);
   const ready = project.duration > 0;
   const encoded = encodeURIComponent(projectId);
 
@@ -119,8 +120,4 @@ export function TransportControls({
       </div>
     </div>
   );
-}
-
-function timeToFrames(time: number, fps: number): number {
-  return time * fps;
 }
