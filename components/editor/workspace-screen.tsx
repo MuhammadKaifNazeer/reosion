@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CodeEditorPane } from "@/components/editor/code-editor-pane";
+import { AIWorkspace } from "@/components/editor/ai-workspace";
 import { PreviewRuntime } from "@/components/runtime/preview-runtime";
 import type {
   CompileStatus,
@@ -344,7 +345,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
               ) : null}
             </div>
           ) : (
-            <AiWorkspacePlaceholder onEscape={() => setActiveTool("code")} />
+            <AIWorkspace />
           )}
         </div>
 

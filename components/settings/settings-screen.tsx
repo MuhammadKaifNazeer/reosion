@@ -7,9 +7,20 @@ import {
   Keyboard,
   KeyRound,
   MonitorCheck,
+  Save,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -18,6 +29,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  PROVIDER_LABELS,
+  loadAIConfig,
+  PROVIDER_MODELS,
+  saveAIConfig,
+  type AIProvider,
+} from "@/lib/ai/settings";
 
 /**
  * Settings is local: nothing here talks to a server. AI provider keys live in
@@ -25,17 +43,41 @@ import { Separator } from "@/components/ui/separator";
  */
 export function SettingsScreen() {
   const [hasProviders, setHasProviders] = useState(false);
+  const [provider, setProvider] = useState<AIProvider>("openai");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState(PROVIDER_MODELS.openai[0]);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    // one-shot read of an external system (localStorage)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- no cascading render; value won't exist before mount
-    setHasProviders(
-      Boolean(
-        window.localStorage.getItem("reosion:ai:provider") &&
-          window.localStorage.getItem("reosion:ai:key"),
-      ),
-    );
+    const config = loadAIConfig();
+    if (config) {
+      setProvider(config.provider);
+      setApiKey(config.apiKey);
+      setModel(config.model);
+      setHasProviders(true);
+    }
   }, []);
+
+  const handleProviderChange = (value: string) => {
+    const p = value as AIProvider;
+    setProvider(p);
+    setModel(PROVIDER_MODELS[p][0]);
+  };
+
+  const handleSave = () => {
+    if (!apiKey.trim()) return;
+    saveAIConfig({ provider, apiKey: apiKey.trim(), model });
+    setHasProviders(true);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  };
+
+  const handleClear = () => {
+    // clear via settings module
+    window.localStorage.removeItem("reosion:ai:config");
+    setApiKey("");
+    setHasProviders(false);
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -80,20 +122,85 @@ export function SettingsScreen() {
               localStorage.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="flex items-center gap-2 text-xs">
               <Badge variant={hasProviders ? "default" : "secondary"}>
                 {hasProviders ? "Configured" : "Not configured"}
               </Badge>
               {hasProviders ? (
-                <span className="text-muted-foreground">
-                  Key stored locally
-                </span>
+                <span className="text-muted-foreground">Key stored locally</span>
               ) : (
                 <span className="text-muted-foreground">
                   Optional — animations work fully without AI
                 </span>
               )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-provider" className="text-xs">
+                  Provider
+                </Label>
+                <Select value={provider} onValueChange={(v) => v && handleProviderChange(v)}>
+                  <SelectTrigger id="ai-provider" className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(PROVIDER_LABELS) as AIProvider[]).map((p) => (
+                      <SelectItem key={p} value={p} className="text-xs">
+                        {PROVIDER_LABELS[p]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-model" className="text-xs">
+                  Model
+                </Label>
+                <Select value={model} onValueChange={(v) => v && setModel(v)}>
+                  <SelectTrigger id="ai-model" className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDER_MODELS[provider].map((m) => (
+                      <SelectItem key={m} value={m} className="text-xs">
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ai-key" className="text-xs">
+                API key
+              </Label>
+              <Input
+                id="ai-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-…"
+                className="h-8 font-mono text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Stored in localStorage on this machine only. Never sent to our
+                servers.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleSave} disabled={!apiKey.trim()}>
+                <Save className="size-3.5" />
+                {saved ? "Saved" : "Save"}
+              </Button>
+              {hasProviders ? (
+                <Button size="sm" variant="outline" onClick={handleClear}>
+                  Clear
+                </Button>
+              ) : null}
             </div>
           </CardContent>
         </Card>
