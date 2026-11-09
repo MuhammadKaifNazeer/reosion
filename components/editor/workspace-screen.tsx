@@ -68,6 +68,19 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
     column: number;
     token: number;
   } | null>(null);
+  const [split, setSplit] = useState(0.62);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = splitContainerRef.current;
+    if (!el) return;
+    const measure = () => setContainerWidth(el.getBoundingClientRect().width);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const clock = useMemo<AnimationClockController>(() => {
     // duration/fps are project settings; recreated only when they change
@@ -270,8 +283,18 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
           />
         </nav>
 
-        {/* center: code / ai + editor */}
-        <div className="flex min-w-0 flex-1 flex-col border-r border-border">
+        {/* center: code / ai + editor — resizable split with the preview */}
+        <div
+          ref={splitContainerRef}
+          className="relative flex min-h-0 min-w-0 flex-1"
+        >
+          <div
+            className="flex min-w-0 flex-col border-r border-border"
+            style={{
+              width: `${split * 100}%`,
+              flexShrink: 0,
+            }}
+          >
           {activeTool === "code" ? (
             <div className="relative flex min-h-0 flex-1 flex-col">
               <div className="flex h-7 shrink-0 items-center gap-2 border-b border-border bg-card px-3 font-mono text-[10px] text-muted-foreground">
@@ -325,8 +348,49 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
           )}
         </div>
 
+        {/* resize handle */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize editor and preview"
+          className="group relative z-10 w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-brand/60"
+          onPointerDown={(e) => {
+            if (e.button !== 0 || containerWidth <= 0) return;
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              /* synthetic events (tests) may not support capture */
+            }
+            const startX = e.clientX;
+            const startSplit = split;
+            const minEditor = 360 / containerWidth;
+            const maxEditor = 1 - 360 / containerWidth;
+            const move = (ev: PointerEvent) => {
+              const next = Math.max(
+                minEditor,
+                Math.min(maxEditor, startSplit + (ev.clientX - startX) / containerWidth),
+              );
+              setSplit(next);
+            };
+            const up = () => {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+              window.removeEventListener("pointercancel", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
+          }}
+        >
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-brand/60" />
+        </div>
+
         {/* right: preview + timeline */}
-        <div className="flex w-[38%] min-w-[280px] max-w-[46rem] shrink-0 flex-col">
+        <div
+          className="flex min-w-0 flex-col"
+          style={{ width: `${(1 - split) * 100}%`, flexShrink: 0 }}
+        >
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-accent/40 p-4">
             <StageFitter width={project.width} height={project.height}>
               {(scale) => (
@@ -390,6 +454,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
             <Timeline clock={clock} />
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
