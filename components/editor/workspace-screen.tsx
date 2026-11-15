@@ -94,12 +94,10 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   const [mounted, setMounted] = useState(false);
   const [draftDuration, setDraftDuration] = useState("");
   const [draftFps, setDraftFps] = useState("");
-  const [draftEndAt, setDraftEndAt] = useState("");
   useEffect(() => {
     if (project) {
       setDraftDuration(String(project.duration));
       setDraftFps(String(project.fps));
-      setDraftEndAt(project.endAt ? String(project.endAt) : "");
     }
   }, [project?.id]);
   useEffect(() => setMounted(true), []);
@@ -135,8 +133,8 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
 
   const clock = useMemo<AnimationClockController>(() => {
     // duration/fps are project settings; recreated only when they change
-    return new AnimationClockController(project?.duration ?? 3, project?.fps ?? 30, project?.endAt);
-  }, [project?.duration, project?.fps, project?.endAt]);
+    return new AnimationClockController(project?.duration ?? 3, project?.fps ?? 30);
+  }, [project?.duration, project?.fps]);
   useClockDriver(clock);
 
   // Load project
@@ -353,24 +351,6 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                     className="h-8"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="endat" className="text-xs">
-                    Animation ends at (s, optional)
-                  </Label>
-                  <Input
-                    id="endat"
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={draftEndAt}
-                    onChange={(e) => setDraftEndAt(e.target.value)}
-                    placeholder="defaults to duration"
-                    className="h-8"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Set when motion stops; a red marker shows on the timeline.
-                  </p>
-                </div>
                 <Button
                   size="sm"
                   className="w-full"
@@ -379,17 +359,9 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                     const fps = Number(draftFps);
                     if (!Number.isFinite(dur) || dur <= 0) return;
                     if (!Number.isFinite(fps) || fps <= 0) return;
-                    const endRaw = draftEndAt.trim();
-                    const endAt =
-                      endRaw === ""
-                        ? undefined
-                        : Number(endRaw);
-                    if (endAt !== undefined && (!Number.isFinite(endAt) || endAt < 0)) {
-                      return;
-                    }
                     const updated = await getStorage().updateProject(
                       project.id,
-                      { duration: dur, fps, endAt },
+                      { duration: dur, fps },
                     );
                     setProject(updated);
                   }}

@@ -40,7 +40,7 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
       }
       setProject(loaded);
       setClock(
-        new AnimationClockController(loaded.duration, loaded.fps, loaded.endAt),
+        new AnimationClockController(loaded.duration, loaded.fps),
       );
     })();
     return () => {

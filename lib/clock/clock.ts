@@ -48,9 +48,6 @@ export interface AnimationClock {
   /** Current time in seconds (unquantized; frame index is derived as needed). */
   readonly time: number;
   readonly duration: number;
-  /** Time at which the animation's motion ends (<= duration). Playback stops here. */
-  readonly endAt: number;
-  readonly effectiveEnd: number;
   readonly fps: number;
   readonly playing: boolean;
   readonly totalFrames: number;
@@ -82,10 +79,7 @@ export class AnimationClockController implements AnimationClock {
   constructor(
     readonly duration: number,
     readonly fps: number,
-    readonly endAt: number = duration,
   ) {
-    const clampedEnd = Math.max(0, Math.min(duration, endAt));
-    this.endAt = clampedEnd;
     this.state = { time: 0, duration, fps, playing: false };
   }
 
@@ -95,10 +89,6 @@ export class AnimationClockController implements AnimationClock {
 
   get playing(): boolean {
     return this.state.playing;
-  }
-
-  get effectiveEnd(): number {
-    return this.endAt;
   }
 
   get totalFrames(): number {
@@ -116,7 +106,7 @@ export class AnimationClockController implements AnimationClock {
 
   play(): void {
     if (this.state.playing) return;
-    if (this.state.time >= this.effectiveEnd - 1e-6) {
+    if (this.state.time >= this.duration - 1e-6) {
       this.update({ time: 0, playing: true });
     } else {
       this.update({ playing: true });
@@ -155,10 +145,10 @@ export class AnimationClockController implements AnimationClock {
   tick(deltaSeconds: number): boolean {
     if (!this.state.playing) return false;
     const next = this.state.time + Math.max(0, deltaSeconds);
-    if (next >= this.effectiveEnd) {
-      // Playback ends once: clamp to exactly `effectiveEnd`, pause, and let the
+    if (next >= this.duration) {
+      // Playback ends once: clamp to exactly `duration`, pause, and let the
       // driver's subscription code stop any further ticking.
-      this.update({ time: this.effectiveEnd, playing: false });
+      this.update({ time: this.duration, playing: false });
       return true;
     }
     this.update({ time: next });

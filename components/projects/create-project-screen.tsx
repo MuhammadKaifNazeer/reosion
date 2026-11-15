@@ -161,8 +161,8 @@ export function CreateProjectScreen() {
                 onChange={(e) => setDuration(e.target.value)}
               />
               <p className="text-[10px] text-muted-foreground">
-                How long the timeline runs. You can change this (and set where the
-                animation ends) later with the gear icon in the editor.
+                How long the timeline runs. You can change this later with the
+                gear icon in the editor.
               </p>
             </div>
 
