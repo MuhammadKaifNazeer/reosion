@@ -202,7 +202,7 @@ function ProjectCard({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger
-              nativeButton={false}
+              nativeButton
               render={
                 <button
                   type="button"
