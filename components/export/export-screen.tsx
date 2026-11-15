@@ -39,7 +39,6 @@ export function ExportScreen({ projectId }: { projectId: string }) {
   const [stageLabel, setStageLabel] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [compileStatus, setCompileStatus] = useState<"idle" | "compiling" | "ok" | "error">("idle");
   const videoBlobRef = useRef<Blob | null>(null);
 
   // Capture plumbing
@@ -94,11 +93,6 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
   const startRender = useCallback(async () => {
     if (!project || !clock || renderingRef.current) return;
-    if (compileStatus !== "ok") {
-      setError("Runtime is still preparing. Please wait a moment and retry.");
-      setPhase("error");
-      return;
-    }
     renderingRef.current = true;
     halfResRef.current = halfRes;
     framesRef.current = [];
@@ -113,18 +107,29 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
       for (let f = 0; f < total; f++) {
         clock.seek(framesToSeconds(f, fps));
-        setCaptureToken((t) => t + 1);
-        // Wait until the runtime posts FRAME for this capture token.
-        await new Promise<void>((resolve, reject) => {
-          const timer = window.setTimeout(
-            () => reject(new Error(`Timed out capturing frame ${f}`)),
-            CAPTURE_TIMEOUT_MS,
-          );
-          frameResolverRef.current = () => {
-            window.clearTimeout(timer);
-            resolve();
-          };
-        });
+        // Capture can occasionally stall (e.g. a backgrounded tab throttles
+        // rAF); retry the frame once before failing the whole export.
+        let captured = false;
+        for (let attempt = 0; attempt < 2 && !captured; attempt++) {
+          setCaptureToken((t) => t + 1);
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const timer = window.setTimeout(
+                () => reject(new Error(`Timed out capturing frame ${f}`)),
+                CAPTURE_TIMEOUT_MS,
+              );
+              frameResolverRef.current = () => {
+                window.clearTimeout(timer);
+                resolve();
+              };
+            });
+            captured = true;
+          } catch (e) {
+            if (attempt === 1) throw e;
+            // brief pause before retrying
+            await new Promise((r) => window.setTimeout(r, 500));
+          }
+        }
         setProgress(((f + 1) / total) * 0.7);
       }
 
@@ -246,17 +251,13 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
               <p className="mt-4 text-[10px] leading-4 text-muted-foreground">
                 Frames are rendered locally through the animation runtime and
-                encoded with ffmpeg.wasm in your browser. The video never
-                leaves your machine.
+                encoded with ffmpeg.wasm in your browser. The video never leaves
+                your machine. Keep this tab in the foreground while exporting.
               </p>
 
-              <Button
-                className="mt-5 w-full"
-                onClick={() => void startRender()}
-                disabled={compileStatus !== "ok"}
-              >
+              <Button className="mt-5 w-full" onClick={() => void startRender()}>
                 <Scissors />
-                {compileStatus === "ok" ? "Start render" : "Preparing runtime…"}
+                Start render
               </Button>
             </div>
           ) : phase === "rendering" ? (
@@ -400,8 +401,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             overflow: "hidden",
             transform: "scale(0.12)",
             transformOrigin: "bottom left",
-            opacity: 1,
-            zIndex: -1,
+            opacity: 0,
             pointerEvents: "none",
           }}
         >
@@ -410,11 +410,6 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             clock={clock}
             captureToken={captureToken}
             onFrame={(dataURL) => void handleFrame(dataURL)}
-            onCompileStatus={(s) => {
-              if (s.kind === "ok") setCompileStatus("ok");
-              else if (s.kind === "compiling") setCompileStatus("compiling");
-              else if (s.kind === "errors") setCompileStatus("error");
-            }}
             onRuntimeStatus={(status) => {
               if (status.kind === "load_error" || status.kind === "render_error") {
                 if (renderingRef.current) {
