@@ -15,11 +15,19 @@ export function useClockDriver(clock: AnimationClockController): void {
     let lastTime: number | null = null;
 
     const loop = (ts: number) => {
+      if (!clock.playing) {
+        rafId = 0;
+        return;
+      }
       if (lastTime === null) lastTime = ts;
       const dt = (ts - lastTime) / 1000;
       lastTime = ts;
       clock.tick(Math.min(dt, 0.25));
-      rafId = window.requestAnimationFrame(loop);
+      if (clock.playing) {
+        rafId = window.requestAnimationFrame(loop);
+      } else {
+        rafId = 0;
+      }
     };
 
     const sync = () => {
