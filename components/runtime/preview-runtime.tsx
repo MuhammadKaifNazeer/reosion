@@ -70,6 +70,11 @@ export function PreviewRuntime({
   const readyRef = useRef(false);
   const compileTokenRef = useRef(0);
   const codeRef = useRef(project.code);
+  // Status callback is held in a ref: the boot effect below must NEVER re-run
+  // (an inline callback from the parent would otherwise re-EXECUTE the
+  // runtime, stacking duplicate React instances inside the sandbox iframe).
+  const statusRef = useRef(onRuntimeStatus);
+  statusRef.current = onRuntimeStatus;
   const [runtimeLoaded, setRuntimeLoaded] = useState(false);
   // Incremented on READY so the compile pipeline re-runs even when
   // `runtimeLoaded` was already true (React bails out on same-value updates).
@@ -106,7 +111,7 @@ export function PreviewRuntime({
         send({ type: "EXECUTE", sources: [source] });
       } catch (error) {
         if (!cancelled) {
-          onRuntimeStatus?.({
+          statusRef.current?.({
             kind: "load_error",
             message: `Runtime failed to load: ${error instanceof Error ? error.message : String(error)}`,
           });
@@ -117,7 +122,7 @@ export function PreviewRuntime({
     return () => {
       cancelled = true;
     };
-  }, [send, onRuntimeStatus]);
+  }, [send]);
 
   // Runtime -> parent messages.
   useEffect(() => {
@@ -139,7 +144,7 @@ export function PreviewRuntime({
         }
         case "RUNTIME_ERROR":
         case "RENDER_ERROR": {
-          onRuntimeStatus?.({
+          statusRef.current?.({
             kind: "load_error",
             message: message.error.message,
             stack: message.error.stack,
@@ -152,8 +157,7 @@ export function PreviewRuntime({
     };
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onRuntimeStatus is a stable callback from the workspace
-  }, [onRuntimeStatus]);
+  }, [send]);
 
   // Compile + load pipeline. Debounced; latest code wins.
   const compileAndLoad = useCallback(

@@ -382,8 +382,10 @@ function handle(message: ParentMessage): void {
       break;
     }
     case "CAPTURE_FRAME": {
-      // Bypass the seek queue for capture: capture the current painted frame.
-      (async () => {
+      // Chain behind pending seeks so a capture always happens after the
+      // queued SET_TIME has fully settled (exact frame painted).
+      inflightSeek = (async () => {
+        await inflightSeek;
         await microflush();
         await captureFrame(message.frameId);
       })();

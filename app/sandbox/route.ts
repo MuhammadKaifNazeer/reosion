@@ -26,11 +26,17 @@ export function GET(): Response {
         "use strict";
         // Only accept messages from our single opener (the parent app).
         var opener = window.parent;
+        // The runtime bundle must execute exactly once per document: a second
+        // EXECUTE would stack a duplicate React instance and message pump
+        // inside this iframe. (The parent also guards against this.)
+        var executed = false;
         window.addEventListener("message", function (event) {
           if (event.source !== opener) return;
           var data = event.data;
           if (!data || typeof data !== "object") return;
           if (data.type === "EXECUTE") {
+            if (executed) return;
+            executed = true;
             var sources = data.sources || [];
             for (var i = 0; i < sources.length; i++) {
               // Executes the runtime bundle built from this repository.
