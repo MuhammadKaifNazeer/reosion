@@ -176,13 +176,23 @@ function StagePreview({
   width: number;
   height: number;
 }) {
+  // Fit the true dimensions into a bounded preview box so the frame keeps
+  // the exact selected proportions: wide ratios grow wide, portrait ratios
+  // grow tall — never clamped into a square.
+  const BOX = 264;
+  const scale = Math.min(BOX / width, BOX / height);
   return (
-    <div className="flex w-full flex-col items-center rounded-lg border border-border bg-card p-4 md:w-72">
-      <div
-        className="flex max-h-64 w-full items-center justify-center overflow-hidden rounded-md bg-[#09090b]"
-        style={{ aspectRatio: `${width} / ${height}` }}
-      >
-        <SquareKanban className="size-5 text-muted-foreground/50" aria-hidden />
+    <div className="flex w-full flex-col items-center rounded-lg border border-border bg-card p-4 md:w-80">
+      <div className="flex h-72 w-full items-center justify-center overflow-hidden rounded-md bg-accent/40">
+        <div
+          className="flex items-center justify-center rounded-sm bg-[#09090b] ring-1 ring-border/60"
+          style={{
+            width: Math.max(8, Math.round(width * scale)),
+            height: Math.max(8, Math.round(height * scale)),
+          }}
+        >
+          <SquareKanban className="size-5 text-muted-foreground/50" aria-hidden />
+        </div>
       </div>
       <p className="mt-2 text-center font-mono text-[10px] text-muted-foreground">
         Stage · {width} × {height} · 30fps

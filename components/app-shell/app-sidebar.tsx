@@ -9,7 +9,6 @@ import {
   CircleHelp,
   LayoutDashboard,
   Settings,
-  SquareKanban,
   UserRound,
 } from "lucide-react";
 
@@ -21,7 +20,6 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: SquareKanban, label: "Projects", href: "/projects" },
 ] as const;
 
 const FOOTER_ITEMS = [
@@ -55,9 +53,6 @@ export function AppSidebar() {
   };
 
   const isActive = (href: string) => {
-    if (href === "/projects") {
-      return pathname.startsWith("/projects") && pathname !== "/projects/new";
-    }
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -65,11 +60,18 @@ export function AppSidebar() {
     <aside
       data-expanded={expanded}
       className={cn(
-        "flex min-h-dvh flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-[width] duration-150",
+        // sticky: keeps the full sidebar in view while the page content
+        // scrolls beside it.
+        "sticky top-0 flex h-dvh flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-[width] duration-150",
         expanded ? "w-52" : "w-13",
       )}
     >
-      <div className="flex h-14 items-center gap-2 px-3">
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-2 px-3",
+          expanded ? "h-14" : "h-auto flex-col justify-center gap-1 py-2",
+        )}
+      >
         <Link href="/" className="flex items-center gap-2 text-foreground">
           <Logo />
           {expanded ? <Wordmark /> : null}
@@ -77,7 +79,7 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="ml-auto text-muted-foreground"
+          className={cn("text-muted-foreground", expanded && "ml-auto")}
           onClick={toggle}
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >

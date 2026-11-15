@@ -10,10 +10,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function StageFitter({
   width,
   height,
+  maxScale = 1,
   children,
 }: {
   width: number;
   height: number;
+  /** Cap on the fit factor (1 = never upscale past true pixel size). */
+  maxScale?: number;
   children: (scale: number) => React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -24,8 +27,8 @@ export function StageFitter({
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const factor = Math.min(rect.width / width, rect.height / height);
-    setScale(Math.max(0.05, Math.min(factor, 1)));
-  }, [width, height]);
+    setScale(Math.max(0.05, Math.min(factor, maxScale)));
+  }, [width, height, maxScale]);
 
   useEffect(() => {
     measure();

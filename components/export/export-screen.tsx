@@ -156,7 +156,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
         <p className="text-sm text-muted-foreground">
           This project could not be found.
         </p>
-        <Button variant="outline" size="sm" render={<Link href="/projects" />}>
+        <Button variant="outline" size="sm" render={<Link href="/dashboard" />}>
           Back to projects
         </Button>
       </div>

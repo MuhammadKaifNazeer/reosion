@@ -54,7 +54,7 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
         <p className="text-sm text-muted-foreground">
           This project could not be found.
         </p>
-        <Button variant="outline" size="sm" render={<Link href="/projects" />}>
+        <Button variant="outline" size="sm" render={<Link href="/dashboard" />}>
           Back to projects
         </Button>
       </div>
@@ -75,7 +75,7 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
   const encoded = encodeURIComponent(projectId);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex h-dvh flex-col bg-background">
       {/* header */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
         <Button variant="ghost" size="sm" render={<Link href={`/projects/${encoded}`} />}>
@@ -99,12 +99,13 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
         </div>
       </header>
 
-      {/* stage */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-accent/40 p-4">
+      {/* stage: full-bleed dark letterbox, like a media player. The video
+          fills the viewport as far as its aspect ratio allows. */}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#09090b]">
         <StageFitter width={project.width} height={project.height}>
           {(scale) => (
             <div
-              className="relative overflow-hidden shadow-xl shadow-black/40 outline-none ring-border/60 ring-1"
+              className="relative overflow-hidden shadow-2xl shadow-black/60 outline-none ring-white/15 ring-1"
               style={{
                 width: Math.round(project.width * scale),
                 height: Math.round(project.height * scale),
@@ -143,8 +144,8 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
           </div>
         ) : null}
 
-        {/* transport overlays the stage bottom */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+        {/* transport overlays the video bottom */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
           <TransportControls
             project={project}
             clock={clock}
@@ -154,7 +155,7 @@ export function PreviewScreen({ projectId }: { projectId: string }) {
       </div>
 
       {/* timeline */}
-      <div className="shrink-0 border-t border-border px-3 py-2">
+      <div className="shrink-0 border-t border-border bg-card px-3 py-2">
         <Timeline clock={clock} />
       </div>
     </div>
