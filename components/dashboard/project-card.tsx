@@ -259,7 +259,7 @@ function ProjectCard({
                   </button>
                 }
               />
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={onPreview}>
                   <Play /> Preview
                 </DropdownMenuItem>
@@ -299,7 +299,7 @@ function ProjectCard({
                   </button>
                 }
               />
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={onPreview}>
                   <Play /> Preview
                 </DropdownMenuItem>

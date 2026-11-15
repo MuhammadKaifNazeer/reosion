@@ -39,6 +39,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
   const [stageLabel, setStageLabel] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compileStatus, setCompileStatus] = useState<"idle" | "compiling" | "ok" | "error">("idle");
   const videoBlobRef = useRef<Blob | null>(null);
 
   // Capture plumbing
@@ -93,6 +94,11 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
   const startRender = useCallback(async () => {
     if (!project || !clock || renderingRef.current) return;
+    if (compileStatus !== "ok") {
+      setError("Runtime is still preparing. Please wait a moment and retry.");
+      setPhase("error");
+      return;
+    }
     renderingRef.current = true;
     halfResRef.current = halfRes;
     framesRef.current = [];
@@ -244,9 +250,13 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 leaves your machine.
               </p>
 
-              <Button className="mt-5 w-full" onClick={() => void startRender()}>
+              <Button
+                className="mt-5 w-full"
+                onClick={() => void startRender()}
+                disabled={compileStatus !== "ok"}
+              >
                 <Scissors />
-                Start render
+                {compileStatus === "ok" ? "Start render" : "Preparing runtime…"}
               </Button>
             </div>
           ) : phase === "rendering" ? (
@@ -390,7 +400,8 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             overflow: "hidden",
             transform: "scale(0.12)",
             transformOrigin: "bottom left",
-            opacity: 0,
+            opacity: 1,
+            zIndex: -1,
             pointerEvents: "none",
           }}
         >
@@ -399,6 +410,11 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             clock={clock}
             captureToken={captureToken}
             onFrame={(dataURL) => void handleFrame(dataURL)}
+            onCompileStatus={(s) => {
+              if (s.kind === "ok") setCompileStatus("ok");
+              else if (s.kind === "compiling") setCompileStatus("compiling");
+              else if (s.kind === "errors") setCompileStatus("error");
+            }}
             onRuntimeStatus={(status) => {
               if (status.kind === "load_error" || status.kind === "render_error") {
                 if (renderingRef.current) {
