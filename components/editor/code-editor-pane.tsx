@@ -65,6 +65,8 @@ export interface CodeEditorPaneProps {
   readOnly?: boolean;
   /** Position the editor should jump to (compile/runtime error location). */
   revealLine?: { line: number; column: number; token: number } | null;
+  /** Toggle Monaco word wrap. */
+  wordWrap?: boolean;
 }
 
 export function CodeEditorPane({
@@ -72,6 +74,7 @@ export function CodeEditorPane({
   onChange,
   readOnly = false,
   revealLine,
+  wordWrap = false,
 }: CodeEditorPaneProps) {
   const editorRef = useRef<{
     reveal: (line: number, column: number) => void;
@@ -139,6 +142,7 @@ export function CodeEditorPane({
         fontSize: 13,
         lineHeight: 20,
         minimap: { enabled: false },
+        wordWrap: wordWrap ? "on" : "off",
         scrollBeyondLastLine: false,
         smoothScrolling: true,
         padding: { top: 12, bottom: 12 },

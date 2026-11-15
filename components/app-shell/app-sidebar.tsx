@@ -11,7 +11,9 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 
+import { useTheme } from "next-themes";
 import { Logo, Wordmark } from "@/components/app-shell/logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -35,6 +37,9 @@ const FOOTER_ITEMS = [
 export function AppSidebar() {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(true);
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     // load-on-mount: peak down to persist the user's preferred width
@@ -133,6 +138,24 @@ export function AppSidebar() {
                 Local user
               </span>
             ) : null}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn(
+                "ml-auto text-muted-foreground",
+                !expanded && "ml-0",
+              )}
+              aria-label="Toggle theme"
+              onClick={() =>
+                setTheme(resolvedTheme === "dark" ? "light" : "dark")
+              }
+            >
+              {mounted && resolvedTheme === "dark" ? (
+                <Sun className="size-3.5" />
+              ) : (
+                <Moon className="size-3.5" />
+              )}
+            </Button>
           </div>
         </div>
       </nav>

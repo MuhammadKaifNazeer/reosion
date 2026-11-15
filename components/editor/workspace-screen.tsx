@@ -10,6 +10,8 @@ import {
   Save,
   Scissors,
   Sparkles,
+  WrapText,
+  AlignLeft,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +79,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   } | null>(null);
   // Split position persists for the browser session (survives reloads and
   // navigation within the tab, not across browser restarts).
+  const [wordWrap, setWordWrap] = useState(false);
   const [split, setSplit] = useState(() => {
     if (typeof window === "undefined") return 0.62;
     const stored = Number(window.sessionStorage.getItem(SPLIT_KEY));
@@ -257,7 +260,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
     compileStatus.kind === "errors" ? compileStatus.errors : [];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       {/* header */}
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <Button
@@ -335,7 +338,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
           {activeTool === "code" ? (
             <div className="relative flex min-h-0 flex-1 flex-col">
               <div className="flex h-7 shrink-0 items-center gap-2 border-b border-border bg-card px-3 font-mono text-[10px] text-muted-foreground">
-                {STAGE_FILE_NAME}
+                <span>{STAGE_FILE_NAME}</span>
                 {compileStatus.kind === "compiling" ? (
                   <span className="flex items-center gap-1">
                     <Loader2 className="size-3 animate-spin" /> compiling
@@ -343,12 +346,24 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                 ) : compileStatus.kind === "ok" ? (
                   <span className="text-brand">· compiled</span>
                 ) : null}
+                <div className="ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={wordWrap ? "Unwrap lines" : "Wrap lines"}
+                    title={wordWrap ? "Unwrap lines" : "Wrap lines"}
+                    onClick={() => setWordWrap((w) => !w)}
+                  >
+                    {wordWrap ? <WrapText /> : <AlignLeft />}
+                  </Button>
+                </div>
               </div>
               <div className="min-h-0 flex-1">
                 <CodeEditorPane
                   value={code ?? ""}
                   onChange={(v) => setCode(v ?? "")}
                   revealLine={errorFocus}
+                  wordWrap={wordWrap}
                 />
               </div>
               {compileErrors.length > 0 ? (
