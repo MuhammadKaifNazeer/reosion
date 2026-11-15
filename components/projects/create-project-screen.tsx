@@ -35,6 +35,7 @@ export function CreateProjectScreen() {
   const [ratio, setRatio] = useState<AspectRatio>("16:9");
   const [customWidth, setCustomWidth] = useState("1920");
   const [customHeight, setCustomHeight] = useState("1080");
+  const [duration, setDuration] = useState("3");
   const [creating, setCreating] = useState(false);
 
   const previewDimensions = useMemo(() => {
@@ -51,7 +52,7 @@ export function CreateProjectScreen() {
         width: previewDimensions.width,
         height: previewDimensions.height,
         fps: 30,
-        duration: 3,
+        duration: Math.max(1, Number.parseFloat(duration) || 3),
       };
       const project = await getStorage().createProject({
         name: name.trim() || "Untitled Animation",
@@ -148,6 +149,22 @@ export function CreateProjectScreen() {
                 </div>
               </div>
             ) : null}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="project-duration">Duration (seconds)</Label>
+              <Input
+                id="project-duration"
+                type="number"
+                min={1}
+                step={0.5}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                How long the timeline runs. You can change this (and set where the
+                animation ends) later with the gear icon in the editor.
+              </p>
+            </div>
 
             <Button className="w-full" onClick={() => void create()} disabled={creating}>
               {creating ? (

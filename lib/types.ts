@@ -19,6 +19,8 @@ export interface Project {
   fps: number;
   /** Duration of the animation in seconds. */
   duration: number;
+  /** Time (seconds) at which the animation's motion ends; defaults to duration. */
+  endAt?: number;
   /** Full source code of Animation.tsx. */
   code: string;
   /** Data URL of a representative frame (generated locally). */

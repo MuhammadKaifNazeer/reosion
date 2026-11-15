@@ -140,6 +140,15 @@ export function Timeline({
             className="absolute inset-y-0 left-0 bg-brand/10"
             style={{ width: `${progress * 100}%` }}
           />
+          {/* animation end marker (red) */}
+          {clock.effectiveEnd < duration - 1e-6 ? (
+            <span
+              aria-hidden
+              title="Animation ends here"
+              className="absolute top-0 bottom-0 z-20 w-0.5 bg-red-500"
+              style={{ left: `${(clock.effectiveEnd / duration) * 100}%` }}
+            />
+          ) : null}
           {/* second labels */}
           {Array.from({ length: seconds + 1 }).map((_, i) => (
             <span

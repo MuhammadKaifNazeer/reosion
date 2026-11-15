@@ -50,7 +50,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
   const clock = useMemo<AnimationClockController | null>(() => {
     if (!project) return null;
-    return new AnimationClockController(project.duration, project.fps);
+    return new AnimationClockController(project.duration, project.fps, project.endAt);
   }, [project?.duration, project?.fps]);
 
   useClockDriver(clock ?? LOADING_CLOCK);
