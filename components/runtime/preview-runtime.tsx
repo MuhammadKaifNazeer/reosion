@@ -38,6 +38,10 @@ interface PreviewRuntimeProps {
   clock: AnimationClockController;
   onCompileStatus?: (status: CompileStatus) => void;
   onRuntimeStatus?: (status: RuntimeStatus) => void;
+  /** Increment to request a single frame capture (thumbnail/export). */
+  captureToken?: number;
+  /** Called with the captured PNG data URL. */
+  onFrame?: (dataURL: string) => void;
   className?: string;
 }
 
@@ -58,6 +62,8 @@ export function PreviewRuntime({
   clock,
   onCompileStatus,
   onRuntimeStatus,
+  captureToken,
+  onFrame,
   className,
 }: PreviewRuntimeProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -127,6 +133,10 @@ export function PreviewRuntime({
           setReadyNonce((n) => n + 1);
           break;
         }
+        case "FRAME": {
+          onFrame?.(message.dataURL);
+          break;
+        }
         case "RUNTIME_ERROR":
         case "RENDER_ERROR": {
           onRuntimeStatus?.({
@@ -190,6 +200,12 @@ export function PreviewRuntime({
     send({ type: "SET_TIME", time: clock.snapshot().time });
     return unsubscribe;
   }, [clock, runtimeLoaded, send]);
+
+  // Capture a frame on demand (thumbnails / export).
+  useEffect(() => {
+    if (!captureToken || !runtimeLoaded || !readyRef.current) return;
+    send({ type: "CAPTURE_FRAME", frameId: captureToken });
+  }, [captureToken, runtimeLoaded, send]);
 
   return (
     <iframe

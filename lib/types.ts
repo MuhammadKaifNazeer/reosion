@@ -21,6 +21,8 @@ export interface Project {
   duration: number;
   /** Full source code of Animation.tsx. */
   code: string;
+  /** Data URL of a representative frame (generated locally). */
+  thumbnail?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -22,6 +22,8 @@ import {
 import { CodeEditorPane } from "@/components/editor/code-editor-pane";
 import { AIWorkspace } from "@/components/editor/ai-workspace";
 import { PreviewRuntime } from "@/components/runtime/preview-runtime";
+import { StageFitter } from "@/components/runtime/stage-fitter";
+import { downscaleDataURL } from "@/lib/thumbnails/downscale";
 import type {
   CompileStatus,
   RuntimeStatus,
@@ -64,6 +66,7 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty">(
     "saved",
   );
+  const [captureRequested, setCaptureRequested] = useState(false);
   const [errorFocus, setErrorFocus] = useState<{
     line: number;
     column: number;
@@ -124,6 +127,16 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
     return () => window.clearTimeout(handle);
     // project intentionally omitted to avoid autosave-after-save loops
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps -- see comment
+
+  // Schedule a thumbnail capture after the code has settled + compiled.
+  useEffect(() => {
+    if (!project || compileStatus.kind !== "ok") return;
+    const handle = window.setTimeout(() => {
+      clock.seek(0);
+      setCaptureRequested(true);
+    }, 500);
+    return () => window.clearTimeout(handle);
+  }, [code, compileStatus.kind, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNow = useCallback(async () => {
     if (!project || !codeRef.current) return;
@@ -417,6 +430,19 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                       clock={clock}
                       onCompileStatus={setCompileStatus}
                       onRuntimeStatus={setRuntimeStatus}
+                      captureToken={captureRequested ? 1 : 0}
+                      onFrame={async (dataURL) => {
+                        setCaptureRequested(false);
+                        try {
+                          const thumb = await downscaleDataURL(dataURL, 480, 0.8);
+                          const updated = await getStorage().updateProject(project.id, {
+                            thumbnail: thumb,
+                          });
+                          setProject(updated);
+                        } catch (e) {
+                          console.error("thumbnail capture failed", e);
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -523,42 +549,6 @@ function SaveIndicator({ state }: { state: "saved" | "saving" | "dirty" }) {
  * Measures its own box and hands children a scale factor that fits the
  * project stage inside it.
  */
-function StageFitter({
-  width,
-  height,
-  children,
-}: {
-  width: number;
-  height: number;
-  children: (scale: number) => React.ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0.25);
-
-  const measure = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const factor = Math.min(rect.width / width, rect.height / height);
-    setScale(Math.max(0.05, Math.min(factor, 1)));
-  }, [width, height]);
-
-  useEffect(() => {
-    measure();
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => measure());
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [measure]);
-
-  return (
-    <div ref={ref} className="flex h-full w-full items-center justify-center">
-      {children(scale)}
-    </div>
-  );
-}
-
 function RuntimeErrorCard({
   message,
   stack,

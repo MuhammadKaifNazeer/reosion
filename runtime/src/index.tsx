@@ -109,6 +109,9 @@ let logicalMs = 0;
 let remountKey = 0;
 let inflightSeek: Promise<void> = Promise.resolve();
 
+const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+const nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+
 window.requestAnimationFrame = ((cb: FrameRequestCallback) => {
   queue.set(nextHandle, cb as (ts: number) => void);
   return nextHandle++;
@@ -283,21 +286,32 @@ async function loadCode(code: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function captureFrame(frameId: number): Promise<void> {
+  const prevRAF = window.requestAnimationFrame;
+  const prevCancel = window.cancelAnimationFrame;
+  window.requestAnimationFrame = nativeRequestAnimationFrame;
+  window.cancelAnimationFrame = nativeCancelAnimationFrame;
   try {
-    const dataURL = await toPng(stageEl, {
-      width: stage.width,
-      height: stage.height,
-      pixelRatio: 1,
-      cacheBust: false,
-      skipFonts: false,
-    });
+    const dataURL = await Promise.race([
+      toPng(stageEl, {
+        width: stage.width,
+        height: stage.height,
+        pixelRatio: 1,
+        cacheBust: false,
+        skipFonts: true,
+      }),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error("toPng timed out")), 10000),
+      ),
+    ]);
     post({ type: "FRAME", frameId, dataURL, width: stage.width, height: stage.height });
   } catch (error) {
     console.error("[runtime] capture failed", error);
-    // Surface as a generic runtime error with context.
     reportError("RUNTIME_ERROR", new Error(
       `Frame capture failed: ${error instanceof Error ? error.message : String(error)}`,
     ));
+  } finally {
+    window.requestAnimationFrame = prevRAF;
+    window.cancelAnimationFrame = prevCancel;
   }
 }
 
@@ -368,8 +382,8 @@ function handle(message: ParentMessage): void {
       break;
     }
     case "CAPTURE_FRAME": {
-      inflightSeek = (async () => {
-        await inflightSeek;
+      // Bypass the seek queue for capture: capture the current painted frame.
+      (async () => {
         await microflush();
         await captureFrame(message.frameId);
       })();

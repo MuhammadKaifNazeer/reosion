@@ -169,15 +169,25 @@ function ProjectCard({
         }}
         className="cursor-pointer rounded-lg border border-border bg-card outline-none transition-colors hover:border-muted-foreground/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
       >
-        {/* Static thumbnail stage — live previews replace this later */}
+        {/* Real animation frame captured from the runtime (thumbnail field). */}
         <div
           className="flex items-center justify-center overflow-hidden bg-[#09090b]"
           style={{ aspectRatio: `${project.width} / ${project.height}` }}
         >
-          <div
-            className="rounded-full bg-gradient-to-tr from-brand via-muted to-transparent opacity-60 transition-transform duration-300 group-hover:scale-110"
-            style={{ width: "38%", height: "38%" }}
-          />
+          {project.thumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL, not a remote asset
+            <img
+              src={project.thumbnail}
+              alt={`${project.name} preview frame`}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <FileCode2
+              className="size-8 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110"
+              aria-hidden
+            />
+          )}
         </div>
         <div className="border-t-border flex items-center gap-2 border-t px-3 py-2.5">
           <div className="min-w-0 flex-1">
