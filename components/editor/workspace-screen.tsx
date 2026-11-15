@@ -37,6 +37,9 @@ import { STAGE_FILE_NAME } from "@/lib/projects/templates";
 import type { Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** sessionStorage key for the editor/preview split position. */
+const SPLIT_KEY = "reosion:split";
+
 /**
  * The project workspace.
  *
@@ -72,19 +75,37 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
     column: number;
     token: number;
   } | null>(null);
-  const [split, setSplit] = useState(0.62);
+  // Split position persists for the browser session (survives reloads and
+  // navigation within the tab, not across browser restarts).
+  const [split, setSplit] = useState(() => {
+    if (typeof window === "undefined") return 0.62;
+    const stored = Number(window.sessionStorage.getItem(SPLIT_KEY));
+    return Number.isFinite(stored) && stored > 0 && stored < 1 ? stored : 0.62;
+  });
+  useEffect(() => {
+    window.sessionStorage.setItem(SPLIT_KEY, String(split));
+  }, [split]);
   const [containerWidth, setContainerWidth] = useState(0);
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  // The split container mounts only after the project loads (the loading
+  // screen renders before it), so capture the element via a ref callback —
+  // an effect with [] deps would run while the ref is still null.
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const el = splitContainerRef.current;
-    if (!el) return;
-    const measure = () => setContainerWidth(el.getBoundingClientRect().width);
+    if (!containerEl) return;
+    const measure = () => {
+      const width = containerEl.getBoundingClientRect().width;
+      setContainerWidth(width);
+      // Keep the stored split inside the 360px-per-side bounds for the
+      // current container (e.g. after a viewport resize).
+      const min = 360 / width;
+      setSplit((prev) => Math.max(min, Math.min(1 - min, prev)));
+    };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(containerEl);
     return () => ro.disconnect();
-  }, []);
+  }, [containerEl]);
 
   const clock = useMemo<AnimationClockController>(() => {
     // duration/fps are project settings; recreated only when they change
@@ -299,7 +320,9 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
 
         {/* center: code / ai + editor — resizable split with the preview */}
         <div
-          ref={splitContainerRef}
+          ref={(el) => {
+            setContainerEl(el);
+          }}
           className="relative flex min-h-0 min-w-0 flex-1"
         >
           <div
@@ -387,7 +410,11 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
               setSplit(next);
             };
             const up = () => {
-              e.currentTarget.releasePointerCapture(e.pointerId);
+              try {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              } catch {
+                /* synthetic events (tests) never captured */
+              }
               window.removeEventListener("pointermove", move);
               window.removeEventListener("pointerup", up);
               window.removeEventListener("pointercancel", up);
