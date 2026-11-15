@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   AnimationClockController,
@@ -31,6 +31,33 @@ export function Timeline({
   const time = snapshot.time;
   const duration = snapshot.duration;
   const progress = duration > 0 ? time / duration : 0;
+  const sliderRef = useRef<HTMLDivElement | null>(null);
+  const [sliderWidth, setSliderWidth] = useState(0);
+  useEffect(() => {
+    const el = sliderRef.current;
+    if (!el) return;
+    const measure = () => setSliderWidth(el.getBoundingClientRect().width);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Adaptive major-label step (like real video editors): show every 1s when
+  // there is room, then 2s, 3s, 5s, 10s, 15s, 30s, 60s, ... as space runs
+  // out, so labels never overlap.
+  const labelStep = (() => {
+    if (duration <= 0 || sliderWidth <= 0) return 1;
+    const candidates = [1, 2, 3, 5, 10, 15, 30, 60, 120, 300, 600];
+    const minGap = 36; // px per label
+    const maxLabels = Math.max(2, Math.floor(sliderWidth / minGap));
+    for (const step of candidates) {
+      const count = Math.floor(duration / step) + 1;
+      if (count <= maxLabels) return step;
+    }
+    return candidates[candidates.length - 1];
+  })();
+
   const wasPlaying = useCallback(
     (el: HTMLElement) => el.dataset.wasPlaying === "1",
     [],
@@ -116,24 +143,26 @@ export function Timeline({
           }
         }}
       >
-        <div className="relative h-7 overflow-hidden rounded-sm border border-border bg-card transition-colors hover:bg-accent/30">
+        <div ref={sliderRef} className="relative h-7 overflow-hidden rounded-sm border border-border bg-card transition-colors hover:bg-accent/30">
           {/* minor ticks: 10 per second */}
-          {Array.from({ length: seconds * 10 + 1 }).map((_, i) => {
-            const isMajor = i % 10 === 0;
-            const left = duration > 0 ? (i / 10 / duration) * 100 : 0;
-            return (
-              <span
-                key={i}
-                aria-hidden
-                className="absolute top-0 w-px bg-border"
-                style={{
-                  left: `${left}%`,
-                  height: isMajor ? "10px" : "5px",
-                  top: isMajor ? 0 : "5px",
-                }}
-              />
-            );
-          })}
+          {seconds * 10 + 1 <= 1200
+            ? Array.from({ length: seconds * 10 + 1 }).map((_, i) => {
+                const isMajor = i % 10 === 0;
+                const left = duration > 0 ? (i / 10 / duration) * 100 : 0;
+                return (
+                  <span
+                    key={i}
+                    aria-hidden
+                    className="absolute top-0 w-px bg-border"
+                    style={{
+                      left: `${left}%`,
+                      height: isMajor ? "10px" : "5px",
+                      top: isMajor ? 0 : "5px",
+                    }}
+                  />
+                );
+              })
+            : null}
           {/* elapsed region */}
           <div
             aria-hidden
@@ -141,16 +170,23 @@ export function Timeline({
             style={{ width: `${progress * 100}%` }}
           />
           {/* second labels */}
-          {Array.from({ length: seconds + 1 }).map((_, i) => (
-            <span
-              key={`label-${i}`}
-              aria-hidden
-              className="absolute top-2 -translate-x-1/2 font-mono text-[9px] text-muted-foreground"
-              style={{ left: `${duration > 0 ? (i / duration) * 100 : 0}%` }}
-            >
-              {i}s
-            </span>
-          ))}
+          {(() => {
+            const labels: number[] = [];
+            for (let t = 0; t <= duration + 1e-9; t += labelStep) {
+              labels.push(t);
+            }
+            if (labels[labels.length - 1] < duration) labels.push(duration);
+            return labels.map((sec) => (
+              <span
+                key={`label-${sec}`}
+                aria-hidden
+                className="absolute top-2 -translate-x-1/2 font-mono text-[9px] text-muted-foreground"
+                style={{ left: `${duration > 0 ? (sec / duration) * 100 : 0}%` }}
+              >
+                {sec}s
+              </span>
+            ));
+          })()}
         </div>
 
         {/* playhead */}
