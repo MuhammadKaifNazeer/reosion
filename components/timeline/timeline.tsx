@@ -32,6 +32,7 @@ export function Timeline({
   const duration = snapshot.duration;
   const progress = duration > 0 ? time / duration : 0;
   const sliderRef = useRef<HTMLDivElement | null>(null);
+  const PAD = 12;
   const [sliderWidth, setSliderWidth] = useState(0);
   useEffect(() => {
     const el = sliderRef.current;
@@ -43,14 +44,16 @@ export function Timeline({
     return () => ro.disconnect();
   }, []);
 
+  const trackWidth = Math.max(1, sliderWidth - PAD * 2);
+
   // Adaptive major-label step (like real video editors): show every 1s when
   // there is room, then 2s, 3s, 5s, 10s, 15s, 30s, 60s, ... as space runs
   // out, so labels never overlap.
   const labelStep = (() => {
-    if (duration <= 0 || sliderWidth <= 0) return 1;
+    if (duration <= 0 || trackWidth <= 0) return 1;
     const candidates = [1, 2, 3, 5, 10, 15, 30, 60, 120, 300, 600];
     const minGap = 36; // px per label
-    const maxLabels = Math.max(2, Math.floor(sliderWidth / minGap));
+    const maxLabels = Math.max(2, Math.floor(trackWidth / minGap));
     for (const step of candidates) {
       const count = Math.floor(duration / step) + 1;
       if (count <= maxLabels) return step;
@@ -75,8 +78,10 @@ export function Timeline({
     event: React.PointerEvent<HTMLDivElement>,
   ): number => {
     const rect = event.currentTarget.getBoundingClientRect();
-    if (rect.width === 0) return 0;
-    return (event.clientX - rect.left) / rect.width;
+    const inner = Math.max(1, rect.width - PAD * 2);
+    if (inner <= 0) return 0;
+    const x = event.clientX - rect.left - PAD;
+    return Math.max(0, Math.min(1, x / inner));
   };
 
   const seconds = Math.ceil(duration);
@@ -148,14 +153,17 @@ export function Timeline({
           {seconds * 10 + 1 <= 1200
             ? Array.from({ length: seconds * 10 + 1 }).map((_, i) => {
                 const isMajor = i % 10 === 0;
-                const left = duration > 0 ? (i / 10 / duration) * 100 : 0;
+                const left =
+                  duration > 0
+                    ? PAD + (i / 10 / duration) * trackWidth
+                    : PAD;
                 return (
                   <span
                     key={i}
                     aria-hidden
                     className="absolute top-0 w-px bg-border"
                     style={{
-                      left: `${left}%`,
+                      left: `${left}px`,
                       height: isMajor ? "10px" : "5px",
                       top: isMajor ? 0 : "5px",
                     }}
@@ -166,8 +174,8 @@ export function Timeline({
           {/* elapsed region */}
           <div
             aria-hidden
-            className="absolute inset-y-0 left-0 bg-brand/10"
-            style={{ width: `${progress * 100}%` }}
+            className="absolute inset-y-0 bg-brand/10"
+            style={{ left: `${PAD}px`, width: `${progress * trackWidth}px` }}
           />
           {/* second labels */}
           {(() => {
@@ -181,7 +189,7 @@ export function Timeline({
                 key={`label-${sec}`}
                 aria-hidden
                 className="absolute top-2 -translate-x-1/2 font-mono text-[9px] text-muted-foreground"
-                style={{ left: `${duration > 0 ? (sec / duration) * 100 : 0}%` }}
+                style={{ left: `${PAD + (duration > 0 ? (sec / duration) * trackWidth : 0)}px` }}
               >
                 {sec}s
               </span>
@@ -193,7 +201,7 @@ export function Timeline({
         <div
           aria-hidden
           className="pointer-events-none absolute top-0 bottom-[-6px] z-10"
-          style={{ left: `${progress * 100}%` }}
+          style={{ left: `${PAD + progress * trackWidth}px` }}
         >
           <div className="h-full w-px bg-brand" />
           <div className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rotate-45 bg-brand" />
