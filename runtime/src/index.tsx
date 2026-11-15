@@ -149,7 +149,7 @@ async function settle(startMs: number, targetMs: number): Promise<void> {
   const fnsPerSecond = stage.fps;
   const span = Math.max(0, targetMs - startMs);
   const exactSteps = Math.ceil((span / 1000) * fnsPerSecond);
-  const steps = Math.max(1, Math.min(exactSteps, 120));
+  const steps = Math.max(1, Math.min(exactSteps, 10000));
   for (let step = 1; step <= steps; step++) {
     const t = startMs + ((targetMs - startMs) * step) / steps;
     pump(t);

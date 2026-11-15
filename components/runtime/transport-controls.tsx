@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
+  ArrowLeft,
   Maximize2,
   Pause,
   Play,
@@ -43,6 +45,8 @@ export function TransportControls({
   const frame = timeToFrame(snapshot.time, project.fps, project.duration);
   const ready = project.duration > 0;
   const encoded = encodeURIComponent(projectId);
+  const pathname = usePathname();
+  const onPreviewPage = pathname?.includes("/preview") ?? false;
 
   return (
     <div className="flex items-center gap-1 rounded-md border border-border bg-background/80 p-1 backdrop-blur-sm">
@@ -103,10 +107,18 @@ export function TransportControls({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Open preview page"
-          render={<Link href={`/projects/${encoded}/preview`} />}
+          aria-label={onPreviewPage ? "Back to editor" : "Open preview page"}
+          render={
+            <Link
+              href={
+                onPreviewPage
+                  ? `/projects/${encoded}`
+                  : `/projects/${encoded}/preview`
+              }
+            />
+          }
         >
-          <Maximize2 />
+          {onPreviewPage ? <ArrowLeft /> : <Maximize2 />}
         </Button>
         <Button
           variant="outline"

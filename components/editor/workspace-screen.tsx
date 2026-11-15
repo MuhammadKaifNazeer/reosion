@@ -9,6 +9,7 @@ import {
   Loader2,
   Save,
   Scissors,
+  Settings,
   Sparkles,
   WrapText,
   AlignLeft,
@@ -18,6 +19,13 @@ import { Moon, Sun } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -84,6 +92,14 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   const [wordWrap, setWordWrap] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [draftDuration, setDraftDuration] = useState("");
+  const [draftFps, setDraftFps] = useState("");
+  useEffect(() => {
+    if (project) {
+      setDraftDuration(String(project.duration));
+      setDraftFps(String(project.fps));
+    }
+  }, [project?.id]);
   useEffect(() => setMounted(true), []);
   const [split, setSplit] = useState(() => {
     if (typeof window === "undefined") return 0.62;
@@ -295,6 +311,66 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
         <SaveIndicator state={saveState} />
 
         <div className="ml-auto flex items-center gap-1">
+          <Popover>
+            <PopoverTrigger>
+              <Button variant="outline" size="sm" aria-label="Project settings">
+                <Settings />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64">
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">
+                  Animation settings
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dur" className="text-xs">
+                    Duration (seconds)
+                  </Label>
+                  <Input
+                    id="dur"
+                    type="number"
+                    min={1}
+                    step={0.5}
+                    value={draftDuration}
+                    onChange={(e) => setDraftDuration(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fps" className="text-xs">
+                    Frame rate (fps)
+                  </Label>
+                  <Input
+                    id="fps"
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={draftFps}
+                    onChange={(e) => setDraftFps(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={async () => {
+                    const dur = Number(draftDuration);
+                    const fps = Number(draftFps);
+                    if (!Number.isFinite(dur) || dur <= 0) return;
+                    if (!Number.isFinite(fps) || fps <= 0) return;
+                    const updated = await getStorage().updateProject(
+                      project.id,
+                      { duration: dur, fps },
+                    );
+                    setProject(updated);
+                  }}
+                >
+                  Apply
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="sm" render={<Link href={`/projects/${encoded}/preview`} />}>
             Preview
           </Button>
