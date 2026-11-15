@@ -70,7 +70,11 @@ export function Timeline({
           // Scrub pauses playback; remember so release can resume it.
           e.currentTarget.dataset.wasPlaying = clock.playing ? "1" : "0";
           clock.pause();
-          e.currentTarget.setPointerCapture(e.pointerId);
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* synthetic events (tests) cannot capture */
+          }
           seekToRatio(ratioFromEvent(e));
         }}
         onPointerMove={(e) => {
