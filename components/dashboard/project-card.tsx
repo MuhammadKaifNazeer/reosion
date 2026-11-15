@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileCode2,
+  LayoutGrid,
+  List,
   MoreVertical,
   Play,
   Scissors,
@@ -33,6 +35,7 @@ export function DashboardScreen() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     async function load() {
@@ -78,6 +81,35 @@ export function DashboardScreen() {
               aria-label="Search projects"
             />
           </div>
+          {/* grid / list view toggle */}
+          <div className="flex items-center rounded-md border border-border bg-card p-0.5">
+            <button
+              type="button"
+              aria-label="Grid view"
+              aria-pressed={view === "grid"}
+              onClick={() => setView("grid")}
+              className={`flex size-7 items-center justify-center rounded-sm transition-colors ${
+                view === "grid"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="List view"
+              aria-pressed={view === "list"}
+              onClick={() => setView("list")}
+              className={`flex size-7 items-center justify-center rounded-sm transition-colors ${
+                view === "list"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <List className="size-3.5" />
+            </button>
+          </div>
           <Button render={<Link href="/projects/new" />}>
             <SquarePlus />
             New Project
@@ -96,13 +128,18 @@ export function DashboardScreen() {
           <EmptyState hasQuery={Boolean(query.trim())} />
         ) : (
           <ul
-            className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+            className={
+              view === "grid"
+                ? "grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+                : "flex flex-col gap-2"
+            }
             aria-label="Projects"
           >
             {filtered.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
+                view={view}
                 onOpen={() => router.push(`/projects/${project.id}`)}
                 onPreview={() => router.push(`/projects/${project.id}/preview`)}
                 onExport={() => router.push(`/projects/${project.id}/export`)}
@@ -144,17 +181,20 @@ function EmptyState({ hasQuery }: { hasQuery: boolean }) {
 
 function ProjectCard({
   project,
+  view = "grid",
   onOpen,
   onPreview,
   onExport,
   onDelete,
 }: {
   project: Project;
+  view?: "grid" | "list";
   onOpen: () => void;
   onPreview: () => void;
   onExport: () => void;
   onDelete: () => void;
 }) {
+  const isList = view === "list";
   return (
     <li className="group">
       <div
@@ -167,19 +207,22 @@ function ProjectCard({
             onOpen();
           }
         }}
-        className="cursor-pointer rounded-lg border border-border bg-card outline-none transition-colors hover:border-muted-foreground/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+        className={`cursor-pointer rounded-lg border border-border bg-card outline-none transition-colors hover:border-muted-foreground/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 ${
+          isList ? "flex items-center gap-3 p-2" : ""
+        }`}
       >
         {/* Real animation frame captured from the runtime (thumbnail field). */}
         <div
-          className="flex items-center justify-center overflow-hidden bg-[#09090b]"
-          style={{ aspectRatio: `${project.width} / ${project.height}` }}
+          className={`flex shrink-0 items-center justify-center overflow-hidden bg-[#09090b] ${
+            isList ? "h-16 w-28 rounded-md" : "aspect-[16/9] w-full"
+          }`}
         >
           {project.thumbnail ? (
             // eslint-disable-next-line @next/next/no-img-element -- data URL, not a remote asset
             <img
               src={project.thumbnail}
               alt={`${project.name} preview frame`}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               loading="lazy"
             />
           ) : (
@@ -189,45 +232,87 @@ function ProjectCard({
             />
           )}
         </div>
-        <div className="border-t-border flex items-center gap-2 border-t px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-foreground">
-              {project.name}
-            </p>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
-              {project.aspectRatio} ·{" "}
-              {formatDimensions(project.width, project.height)} · {project.duration}
-              s · {formatRelativeTime(project.updatedAt)}
-            </p>
+        {isList ? (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {project.name}
+              </p>
+              <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                {project.aspectRatio} ·{" "}
+                {formatDimensions(project.width, project.height)} · {project.duration}
+                s · {formatRelativeTime(project.updatedAt)}
+              </p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                nativeButton
+                render={
+                  <button
+                    type="button"
+                    aria-label="Project actions"
+                    aria-haspopup="menu"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted aria-expanded:bg-muted"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="size-3.5" />
+                  </button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onPreview}>
+                  <Play /> Preview
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExport}>
+                  <Scissors /> Export
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                  <Trash2 /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              nativeButton
-              render={
-                <button
-                  type="button"
-                  aria-label="Project actions"
-                  aria-haspopup="menu"
-                  className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted aria-expanded:bg-muted"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical className="size-3.5" />
-                </button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onPreview}>
-                <Play /> Preview
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onExport}>
-                <Scissors /> Export
-              </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                <Trash2 /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        ) : (
+          <div className="border-t-border flex items-center gap-2 border-t px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {project.name}
+              </p>
+              <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                {project.aspectRatio} ·{" "}
+                {formatDimensions(project.width, project.height)} · {project.duration}
+                s · {formatRelativeTime(project.updatedAt)}
+              </p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                nativeButton
+                render={
+                  <button
+                    type="button"
+                    aria-label="Project actions"
+                    aria-haspopup="menu"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted aria-expanded:bg-muted"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="size-3.5" />
+                  </button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onPreview}>
+                  <Play /> Preview
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExport}>
+                  <Scissors /> Export
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                  <Trash2 /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
     </li>
   );

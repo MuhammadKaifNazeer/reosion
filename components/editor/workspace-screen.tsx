@@ -13,6 +13,8 @@ import {
   WrapText,
   AlignLeft,
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,9 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   // Split position persists for the browser session (survives reloads and
   // navigation within the tab, not across browser restarts).
   const [wordWrap, setWordWrap] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [split, setSplit] = useState(() => {
     if (typeof window === "undefined") return 0.62;
     const stored = Number(window.sessionStorage.getItem(SPLIT_KEY));
@@ -319,6 +324,22 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
             active={activeTool === "ai"}
             onClick={() => setActiveTool("ai")}
           />
+          <div className="mt-auto flex flex-col items-center gap-1 pb-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Toggle theme"
+              onClick={() =>
+                setTheme(resolvedTheme === "dark" ? "light" : "dark")
+              }
+            >
+              {mounted && resolvedTheme === "dark" ? (
+                <Sun className="size-3.5" />
+              ) : (
+                <Moon className="size-3.5" />
+              )}
+            </Button>
+          </div>
         </nav>
 
         {/* center: code / ai + editor — resizable split with the preview */}
