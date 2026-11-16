@@ -388,19 +388,14 @@ function buildStageSvg(): string {
 
 function loadImageFromSvg(svg: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(
-      new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
-    );
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("stage rasterization failed"));
-    };
-    img.src = url;
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("stage rasterization failed"));
+    // A data: URL (not a blob: URL) is required: images loaded from blob
+    // URLs taint canvases in opaque-origin (sandboxed) documents, which
+    // makes the produced ImageBitmap impossible to transfer. data: URLs
+    // keep the canvas origin-clean.
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   });
 }
 
