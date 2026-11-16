@@ -101,11 +101,23 @@ export function ExportScreen({ projectId }: { projectId: string }) {
     setError(null);
     setStageLabel("Rendering frames…");
 
+    // Track tab visibility: capture stalls when the tab is backgrounded.
+    const hiddenRef = { current: document.visibilityState === "hidden" };
+    const onVisibility = () => {
+      hiddenRef.current = document.visibilityState === "hidden";
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     try {
       const total = clock.totalFrames;
       const fps = project.fps;
 
       for (let f = 0; f < total; f++) {
+        if (hiddenRef.current) {
+          throw new Error(
+            "Export paused: this tab was moved to the background. Keep the tab in the foreground and retry.",
+          );
+        }
         clock.seek(framesToSeconds(f, fps));
         // Capture can occasionally stall (e.g. a backgrounded tab throttles
         // rAF); retry the frame once before failing the whole export.
@@ -156,6 +168,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
     } finally {
+      document.removeEventListener("visibilitychange", onVisibility);
       renderingRef.current = false;
       frameResolverRef.current = null;
     }
