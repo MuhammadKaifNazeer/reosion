@@ -39,9 +39,24 @@ export function GET(): Response {
             executed = true;
             var sources = data.sources || [];
             for (var i = 0; i < sources.length; i++) {
-              // Executes the runtime bundle built from this repository.
-              // eslint-disable-next-line no-eval
-              (0, eval)(sources[i]);
+              try {
+                // Executes the runtime bundle built from this repository.
+                // eslint-disable-next-line no-eval
+                (0, eval)(sources[i]);
+              } catch (e) {
+                opener.postMessage(
+                  {
+                    type: "RUNTIME_ERROR",
+                    error: {
+                      message:
+                        "Sandbox eval failed: " +
+                        (e && e.message ? e.message : String(e)),
+                      stack: e && e.stack ? e.stack : "",
+                    },
+                  },
+                  "*"
+                );
+              }
             }
           }
         });

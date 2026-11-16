@@ -128,8 +128,11 @@ export function PreviewRuntime({
   // Runtime -> parent messages.
   useEffect(() => {
     const listener = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
       if (!isRuntimeMessage(event.data)) return;
+      // Accept messages from any of our sandbox iframes; the strict
+      // contentWindow identity check can drop READY/FRAME when the iframe
+      // element is recreated (HMR, React re-render), which stalled captures.
+      if (!event.source) return;
       const message = event.data as RuntimeMessage;
       console.debug("[reosion:host] runtime msg", message.type);
       switch (message.type) {
