@@ -11,24 +11,44 @@ import {
   AnimationClockController,
   framesToSeconds,
 } from "@/lib/clock/clock";
-import { downscaleToPng } from "@/lib/export/canvas";
 import {
-  downloadBlob,
-  encodeFramesToVideo,
-} from "@/lib/export/ffmpeg";
+  bitmapToDataURL,
+  downscaleToPng,
+} from "@/lib/export/canvas";
+import { downloadBlob, encodeFramesToVideo } from "@/lib/export/ffmpeg";
+import {
+  NativeVideoEncoder,
+  evenDimensions,
+  pickNativeCodec,
+  type NativeCodecInfo,
+} from "@/lib/export/native";
 import { formatDimensions } from "@/lib/format";
 import { getStorage } from "@/lib/projects/storage";
+import type { FrameMessage } from "@/lib/protocol/messages";
 import type { Project } from "@/lib/types";
 
 type Phase = "settings" | "rendering" | "done" | "error";
 
 const CAPTURE_TIMEOUT_MS = 30_000;
 
+interface ExportSummary {
+  engine: string;
+  codec: string | null;
+  frames: number;
+  /** Average per-frame capture cost (sandbox raster + transfer), ms. */
+  avgCaptureMs: number;
+  /** First frame cost (includes cold caches), ms. */
+  firstFrameMs: number;
+  finalizeMs: number;
+  totalMs: number;
+  bytes: number;
+}
+
 /**
  * Local export screen: renders every animation frame through the same
- * sandboxed runtime the preview uses, encodes them with ffmpeg.wasm entirely
- * in the browser, and hands the resulting video back as a local Blob.
- * Nothing is ever uploaded to a server.
+ * sandboxed runtime the preview uses, encodes them with the browser's native
+ * WebCodecs encoder (mediabunny muxing) when available, and otherwise falls
+ * back to ffmpeg.wasm. Everything runs locally; nothing is uploaded.
  */
 export function ExportScreen({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -37,16 +57,24 @@ export function ExportScreen({ projectId }: { projectId: string }) {
   const [halfRes, setHalfRes] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stageLabel, setStageLabel] = useState("");
+  const [frameStatus, setFrameStatus] = useState<{
+    index: number;
+    total: number;
+    time: number;
+  } | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<ExportSummary | null>(null);
   const videoBlobRef = useRef<Blob | null>(null);
 
   // Capture plumbing
   const [captureToken, setCaptureToken] = useState(0);
-  const frameResolverRef = useRef<(() => void) | null>(null);
+  const captureTokenRef = useRef(0);
+  const frameResolverRef = useRef<((frame: FrameMessage) => void) | null>(null);
   const framesRef = useRef<string[]>([]);
   const halfResRef = useRef(false);
   const renderingRef = useRef(false);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const clock = useMemo<AnimationClockController | null>(() => {
     if (!project) return null;
@@ -71,24 +99,38 @@ export function ExportScreen({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
+  /** Structured, timestamped diagnostics for the whole render job. */
+  const startRenderRef = useRef<{ t0: number } | null>(null);
+  const logStage = useCallback(
+    (stage: string, detail?: Record<string, unknown>) => {
+      const ms = startRenderRef.current
+        ? Math.round(performance.now() - startRenderRef.current.t0)
+        : 0;
+      console.info(
+        `[reosion:export] ${stage} (+${ms}ms)`,
+        detail ?? {},
+      );
+    },
+    [],
+  );
+
   /**
-   * Called by the runtime for every captured frame. Pushes (optionally
-   * downscaled) PNG data into the frame list and releases the render loop.
+   * Called by the runtime for every captured frame. Routes the frame into
+   * the encoder (or the PNG fallback buffer), updates the live preview and
+   * releases the capture promise.
    */
-  const handleFrame = useCallback(async (dataURL: string) => {
-    const scale = halfResRef.current ? 0.5 : 1;
-    let out = dataURL;
-    if (scale !== 1) {
-      try {
-        out = await downscaleToPng(dataURL, scale);
-      } catch {
-        // Fall back to the full-resolution frame on any canvas failure.
-        out = dataURL;
-      }
-    }
-    framesRef.current.push(out);
-    frameResolverRef.current?.();
+  const handleFrame = useCallback((frame: FrameMessage) => {
+    if (frame.frameId !== captureTokenRef.current) return; // stale retry frame
+    const resolver = frameResolverRef.current;
     frameResolverRef.current = null;
+    if (!resolver) return;
+    // Draw the live preview before handing control back to the render loop.
+    const canvas = previewCanvasRef.current;
+    if (canvas && frame.bitmap) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.drawImage(frame.bitmap, 0, 0, canvas.width, canvas.height);
+    }
+    resolver(frame);
   }, []);
 
   const startRender = useCallback(async () => {
@@ -96,21 +138,59 @@ export function ExportScreen({ projectId }: { projectId: string }) {
     renderingRef.current = true;
     halfResRef.current = halfRes;
     framesRef.current = [];
+    captureTokenRef.current = captureToken;
     setPhase("rendering");
     setProgress(0);
     setError(null);
+    setSummary(null);
+    setFrameStatus(null);
     setStageLabel("Rendering frames…");
+    startRenderRef.current = { t0: performance.now() };
 
-    // Track tab visibility: capture stalls when the tab is backgrounded.
+    // Track tab visibility: rAF-dependent work stalls when backgrounded.
     const hiddenRef = { current: document.visibilityState === "hidden" };
     const onVisibility = () => {
       hiddenRef.current = document.visibilityState === "hidden";
     };
     document.addEventListener("visibilitychange", onVisibility);
 
+    let encoder: NativeVideoEncoder | null = null;
+    let codecInfo: NativeCodecInfo | null = null;
+
     try {
-      const total = clock.totalFrames;
       const fps = project.fps;
+      const total = clock.totalFrames;
+      const scale = halfRes ? 0.5 : 1;
+      const out = evenDimensions(
+        Math.round(project.width * scale),
+        Math.round(project.height * scale),
+      );
+
+      logStage("render-started", {
+        resolution: `${out.width}x${out.height}`,
+        fps,
+        duration: project.duration,
+        totalFrames: total,
+      });
+
+      // Encoder selection happens up-front so the whole loop can stream.
+      codecInfo = await pickNativeCodec(out.width, out.height);
+      if (codecInfo) {
+        encoder = new NativeVideoEncoder(codecInfo, fps);
+        await encoder.start();
+        logStage("encoder-ready", {
+          engine: "webcodecs+mediabunny",
+          codec: codecInfo.codec,
+        });
+        setStageLabel(`Rendering frames · ${codecInfo.codec.toUpperCase()}`);
+      } else {
+        logStage("encoder-fallback", { engine: "ffmpeg.wasm" });
+        setStageLabel("Rendering frames · ffmpeg.wasm");
+      }
+
+      let captureTotalMs = 0;
+      let captureCount = 0;
+      let firstFrameMs = 0;
 
       for (let f = 0; f < total; f++) {
         if (hiddenRef.current) {
@@ -118,43 +198,123 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             "Export paused: this tab was moved to the background. Keep the tab in the foreground and retry.",
           );
         }
-        clock.seek(framesToSeconds(f, fps));
-        // Capture can occasionally stall (e.g. a backgrounded tab throttles
-        // rAF); retry the frame once before failing the whole export.
-        let captured = false;
-        for (let attempt = 0; attempt < 2 && !captured; attempt++) {
-          setCaptureToken((t) => t + 1);
+        const time = framesToSeconds(f, fps);
+        clock.seek(time);
+
+        // Capture can occasionally stall (e.g. throttled rAF); retry the
+        // frame once before failing the whole export.
+        let frame: FrameMessage | null = null;
+        let captureMs = 0;
+        for (let attempt = 0; attempt < 2 && !frame; attempt++) {
+          const attemptT0 = performance.now();
           try {
-            await new Promise<void>((resolve, reject) => {
+            captureTokenRef.current += 1;
+            setCaptureToken(captureTokenRef.current);
+            frame = await new Promise<FrameMessage>((resolve, reject) => {
               const timer = window.setTimeout(
                 () => reject(new Error(`Timed out capturing frame ${f}`)),
                 CAPTURE_TIMEOUT_MS,
               );
-              frameResolverRef.current = () => {
+              frameResolverRef.current = (msg) => {
                 window.clearTimeout(timer);
-                resolve();
+                resolve(msg);
               };
             });
-            captured = true;
           } catch (e) {
+            frameResolverRef.current = null;
             if (attempt === 1) throw e;
-            // brief pause before retrying
+            logStage("capture-retry", { frame: f });
             await new Promise((r) => window.setTimeout(r, 500));
+            continue;
           }
+          captureMs = performance.now() - attemptT0;
         }
-        setProgress(((f + 1) / total) * 0.7);
+        if (!frame) throw new Error(`Failed to capture frame ${f}`);
+
+        captureTotalMs += captureMs;
+        captureCount++;
+        if (f === 0) firstFrameMs = captureMs;
+
+        setFrameStatus({ index: f + 1, total, time });
+
+        // Feed the encoder and immediately release the bitmap's memory.
+        if (encoder && frame.bitmap) {
+          await encoder.addBitmap(frame.bitmap, time, 1 / fps);
+          frame.bitmap.close();
+        } else {
+          let png = frame.dataURL;
+          if (png && scale !== 1) {
+            try {
+              png = await downscaleToPng(png, scale);
+            } catch {
+              // Keep the full-resolution frame on canvas failure.
+            }
+          } else if (!png && frame.bitmap) {
+            png = await bitmapToDataURL(frame.bitmap, scale);
+          }
+          if (!png) throw new Error(`Frame ${f} arrived without pixel data`);
+          frame.bitmap?.close();
+          if (scale !== 1) {
+            try {
+              png = await downscaleToPng(png, scale);
+            } catch {
+              // Keep the full-resolution frame on canvas failure.
+            }
+          }
+          framesRef.current.push(png);
+        }
+
+        setProgress(0.05 + ((f + 1) / total) * 0.85);
       }
 
-      setStageLabel("Encoding video (ffmpeg.wasm)…");
-      const blob = await encodeFramesToVideo(
-        framesRef.current,
-        fps,
-        (p) => setProgress(0.7 + p * 0.3),
-      );
+      logStage("frames-rendered", {
+        frames: captureCount,
+        avgCaptureMs: Math.round(captureTotalMs / Math.max(1, captureCount)),
+        firstFrameMs: Math.round(firstFrameMs),
+      });
+
+      const finalizeT0 = performance.now();
+      let blob: Blob;
+      if (encoder) {
+        setStageLabel("Finalizing video…");
+        setProgress(0.95);
+        blob = await encoder.finish();
+      } else {
+        setStageLabel("Encoding video (ffmpeg.wasm)…");
+        setProgress(0.9);
+        blob = await encodeFramesToVideo(framesRef.current, fps, (p) =>
+          setProgress(0.9 + p * 0.1),
+        );
+      }
+      framesRef.current = [];
+      const finalizeMs = Math.round(performance.now() - finalizeT0);
+      const totalMs = Math.round(performance.now() - startRenderRef.current.t0);
+
+      logStage("export-complete", { bytes: blob.size, finalizeMs, totalMs });
+
+      const engine =
+        codecInfo && codecInfo.codec === "avc"
+          ? "WebCodecs · H.264"
+          : codecInfo
+            ? `WebCodecs · ${codecInfo.codec.toUpperCase()}`
+            : "ffmpeg.wasm · H.264";
+
+      // Trust only a non-empty result.
+      if (blob.size === 0) throw new Error("encoder produced an empty file");
 
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       videoBlobRef.current = blob;
+      setSummary({
+        engine,
+        codec: codecInfo?.codec ?? "libx264",
+        frames: captureCount,
+        avgCaptureMs: Math.round(captureTotalMs / Math.max(1, captureCount)),
+        firstFrameMs: Math.round(firstFrameMs),
+        finalizeMs,
+        totalMs,
+        bytes: blob.size,
+      });
       setProgress(1);
       setPhase("done");
       // Auto-download; a visible Download button always remains available.
@@ -165,6 +325,11 @@ export function ExportScreen({ projectId }: { projectId: string }) {
           .replace(/^-+|-+$/g, "") || "animation";
       downloadBlob(blob, `${slug}.mp4`);
     } catch (e) {
+      logStage("render-error", {
+        stage: encoder ? "render/finalize" : "render/capture",
+        message: e instanceof Error ? e.message : String(e),
+      });
+      console.error("[reosion:export] failure", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
     } finally {
@@ -172,7 +337,22 @@ export function ExportScreen({ projectId }: { projectId: string }) {
       renderingRef.current = false;
       frameResolverRef.current = null;
     }
-  }, [project, clock, halfRes]);
+  }, [project, clock, halfRes, captureToken, logStage]);
+
+  // `?autostart=1` (used by the /dev render benchmark) kicks off the render
+  // shortly after mount, giving the runtime a moment to boot and load code.
+  const startRenderLatestRef = useRef(startRender);
+  startRenderLatestRef.current = startRender;
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("autostart") !== "1") {
+      return;
+    }
+    const timer = window.setTimeout(
+      () => void startRenderLatestRef.current(),
+      2500,
+    );
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (missing) {
     return (
@@ -201,6 +381,8 @@ export function ExportScreen({ projectId }: { projectId: string }) {
   const encoded = encodeURIComponent(projectId);
   const halfWidth = Math.round(project.width / 2);
   const halfHeight = Math.round(project.height / 2);
+  const outWidth = halfRes ? halfWidth : project.width;
+  const outHeight = halfRes ? halfHeight : project.height;
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -264,8 +446,9 @@ export function ExportScreen({ projectId }: { projectId: string }) {
 
               <p className="mt-4 text-[10px] leading-4 text-muted-foreground">
                 Frames are rendered locally through the animation runtime and
-                encoded with ffmpeg.wasm in your browser. The video never leaves
-                your machine. Keep this tab in the foreground while exporting.
+                encoded with your browser&apos;s native video encoder (ffmpeg.wasm
+                fallback). The video never leaves your machine. Keep this tab in
+                the foreground while exporting.
               </p>
 
               <Button className="mt-5 w-full" onClick={() => void startRender()}>
@@ -279,8 +462,23 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 Rendering your animation
               </h1>
               <p className="mt-1 text-xs text-muted-foreground">{stageLabel}</p>
+              <canvas
+                ref={previewCanvasRef}
+                width={Math.max(2, outWidth)}
+                height={Math.max(2, outHeight)}
+                className="mt-4 w-full rounded-md bg-black"
+                style={{ aspectRatio: `${outWidth} / ${outHeight}` }}
+              />
+              <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+                <span>
+                  {frameStatus
+                    ? `Frame ${frameStatus.index} / ${frameStatus.total} · ${frameStatus.time.toFixed(3)}s`
+                    : "Waiting for first frame…"}
+                </span>
+                <span>{Math.round(progress * 100)}%</span>
+              </div>
               <div
-                className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"
+                className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
                 role="progressbar"
                 aria-valuenow={Math.round(progress * 100)}
                 aria-valuemin={0}
@@ -291,9 +489,6 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                   style={{ width: `${Math.round(progress * 100)}%` }}
                 />
               </div>
-              <p className="mt-2 text-right font-mono text-[10px] text-muted-foreground">
-                {Math.round(progress * 100)}%
-              </p>
             </div>
           ) : phase === "done" && videoUrl ? (
             <div className="rounded-lg border border-border bg-card p-5">
@@ -303,7 +498,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
               <video
                 src={videoUrl}
                 className="mt-4 w-full rounded-md bg-black"
-                style={{ aspectRatio: `${halfRes ? halfWidth : project.width} / ${halfRes ? halfHeight : project.height}` }}
+                style={{ aspectRatio: `${outWidth} / ${outHeight}` }}
                 controls
                 autoPlay
                 loop
@@ -319,9 +514,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 </div>
                 <div className="flex justify-between">
                   <dt>Resolution</dt>
-                  <dd className="text-foreground">
-                    {halfRes ? halfWidth : project.width} × {halfRes ? halfHeight : project.height}
-                  </dd>
+                  <dd className="text-foreground">{outWidth} × {outHeight}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Frame rate</dt>
@@ -331,6 +524,34 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                   <dt>Duration</dt>
                   <dd className="text-foreground">{project.duration}s</dd>
                 </div>
+                {summary ? (
+                  <>
+                    <div className="flex justify-between">
+                      <dt>Encoder</dt>
+                      <dd className="text-foreground">{summary.engine}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Frames</dt>
+                      <dd className="text-foreground">{summary.frames}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Avg capture</dt>
+                      <dd className="text-foreground">{summary.avgCaptureMs}ms / frame</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>First frame</dt>
+                      <dd className="text-foreground">{summary.firstFrameMs}ms</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Finalize</dt>
+                      <dd className="text-foreground">{summary.finalizeMs}ms</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Total</dt>
+                      <dd className="text-foreground">{(summary.totalMs / 1000).toFixed(1)}s</dd>
+                    </div>
+                  </>
+                ) : null}
               </dl>
               <div className="mt-5 flex gap-2">
                 <Button
@@ -400,8 +621,8 @@ export function ExportScreen({ projectId }: { projectId: string }) {
           rendering; unmounted afterwards to free the sandbox. It must stay
           inside the viewport (scaled down + transparent) — offscreen sandboxed
           iframes get their rAF throttled by the browser, which would stall
-          html-to-image captures. Visual scaling does not affect captures: the
-          stage inside lays out at true project pixel size. */}
+          captures. Visual scaling does not affect captures: the stage inside
+          lays out at true project pixel size. */}
       {phase === "settings" || phase === "rendering" ? (
         <div
           aria-hidden
@@ -422,7 +643,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
             project={project}
             clock={clock}
             captureToken={captureToken}
-            onFrame={(dataURL) => void handleFrame(dataURL)}
+            onFrame={handleFrame}
             onRuntimeStatus={(status) => {
               if (status.kind === "load_error" || status.kind === "render_error") {
                 if (renderingRef.current) {

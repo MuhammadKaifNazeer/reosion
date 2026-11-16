@@ -2,6 +2,20 @@
  * Canvas helpers for the export pipeline.
  */
 
+/** Rasterizes an ImageBitmap into a PNG data URL, optionally scaled down. */
+export async function bitmapToDataURL(
+  bitmap: ImageBitmap,
+  scale = 1,
+): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas context unavailable");
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
+
 /** Downscales a PNG data URL by `scale` (0 < scale <= 1) via canvas. */
 export async function downscaleToPng(
   dataURL: string,

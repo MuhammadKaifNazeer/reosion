@@ -35,6 +35,7 @@ import { CodeEditorPane } from "@/components/editor/code-editor-pane";
 import { AIWorkspace } from "@/components/editor/ai-workspace";
 import { PreviewRuntime } from "@/components/runtime/preview-runtime";
 import { StageFitter } from "@/components/runtime/stage-fitter";
+import { bitmapToDataURL } from "@/lib/export/canvas";
 import { downscaleDataURL } from "@/lib/thumbnails/downscale";
 import type {
   CompileStatus,
@@ -570,9 +571,15 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                       onCompileStatus={setCompileStatus}
                       onRuntimeStatus={setRuntimeStatus}
                       captureToken={captureRequested ? 1 : 0}
-                      onFrame={async (dataURL) => {
+                      onFrame={async (frame) => {
                         setCaptureRequested(false);
                         try {
+                          let dataURL = frame.dataURL;
+                          if (!dataURL && frame.bitmap) {
+                            dataURL = await bitmapToDataURL(frame.bitmap);
+                          }
+                          if (!dataURL) return;
+                          frame.bitmap?.close();
                           const thumb = await downscaleDataURL(dataURL, 480, 0.8);
                           const updated = await getStorage().updateProject(project.id, {
                             thumbnail: thumb,

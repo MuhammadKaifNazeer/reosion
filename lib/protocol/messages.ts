@@ -111,14 +111,24 @@ export interface DurationMessage {
   duration: number;
 }
 
-/** One captured frame of the stage (export pipeline). */
+/**
+ * One captured frame of the stage (export pipeline).
+ *
+ * The preferred transport is a transferable `ImageBitmap` (fast path, no PNG
+ * encoding); `dataURL` is the fallback for environments without bitmap
+ * support or when the fast rasterizer could not be used.
+ */
 export interface FrameMessage {
   type: "FRAME";
   frameId: number;
-  /** PNG data URL of the stage. */
-  dataURL: string;
+  /** Decoded frame pixels (transferred, not cloned). */
+  bitmap?: ImageBitmap;
+  /** PNG data URL of the stage (fallback transport). */
+  dataURL?: string;
   width: number;
   height: number;
+  /** How long the sandbox took to produce the pixels (ms, diagnostics). */
+  captureMs?: number;
 }
 
 /** Runtime echoes clock moves so the parent can stay in sync when needed. */

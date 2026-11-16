@@ -8,6 +8,7 @@ import {
 } from "@/lib/compiler/compile";
 import type { AnimationClockController } from "@/lib/clock/clock";
 import {
+  type FrameMessage,
   type RuntimeMessage,
   isRuntimeMessage,
 } from "@/lib/protocol/messages";
@@ -40,8 +41,8 @@ interface PreviewRuntimeProps {
   onRuntimeStatus?: (status: RuntimeStatus) => void;
   /** Increment to request a single frame capture (thumbnail/export). */
   captureToken?: number;
-  /** Called with the captured PNG data URL. */
-  onFrame?: (dataURL: string) => void;
+  /** Called with each captured frame (bitmap or PNG data URL). */
+  onFrame?: (frame: FrameMessage) => void;
   className?: string;
 }
 
@@ -139,7 +140,7 @@ export function PreviewRuntime({
           break;
         }
         case "FRAME": {
-          onFrame?.(message.dataURL);
+          onFrame?.(message);
           break;
         }
         case "RUNTIME_ERROR":

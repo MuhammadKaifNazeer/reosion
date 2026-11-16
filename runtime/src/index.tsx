@@ -261,6 +261,9 @@ async function evalModule(code: string): Promise<UserModule> {
 
 async function loadCode(code: string): Promise<void> {
   remountKey++;
+  // The CSS cache must be rebuilt: new user code can introduce new Tailwind
+  // classes and therefore new stylesheet rules.
+  cachedCSS = null;
   let component: React.ComponentType | null = null;
   try {
     const mod = await evalModule(code);
@@ -283,9 +286,158 @@ async function loadCode(code: string): Promise<void> {
 
 // ---------------------------------------------------------------------------
 // Frame capture (export pipeline)
+//
+// The stage is rasterized with a lean SVG foreignObject pipeline:
+//   1. the sandbox document's CSS is serialized once and cached across frames
+//   2. each frame clones the stage DOM, inlines pseudo-element content, and
+//      rasterizes the SVG image into an OffscreenCanvas
+//   3. pixels are handed to the parent as a transferable ImageBitmap — no PNG
+//      encode, no data URL round-trip
+//
+// `toPng` (html-to-image) is kept strictly as a fallback for stages the lean
+// pipeline cannot handle (e.g. external images, which foreignObject images
+// are not allowed to fetch).
 // ---------------------------------------------------------------------------
 
+// Serialized CSS of the sandbox document, cached across frames. Rebuilt after
+// every LOAD_CODE and whenever the stylesheet rule count changes (Tailwind's
+// browser runtime appends rules lazily as new classes appear).
+let cachedCSS: string | null = null;
+let cachedCSSRuleCount = -1;
+
+function collectCSS(): string {
+  let ruleCount = 0;
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      ruleCount += sheet.cssRules.length;
+    } catch {
+      // Foreign-origin sheets cannot be read; the sandbox has none.
+    }
+  }
+  if (cachedCSS !== null && ruleCount === cachedCSSRuleCount) return cachedCSS;
+  let css = "";
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      for (const rule of Array.from(sheet.cssRules)) css += `${rule.cssText}\n`;
+    } catch {
+      // Ignore unreadable sheets.
+    }
+  }
+  cachedCSS = css;
+  cachedCSSRuleCount = ruleCount;
+  return css;
+}
+
+function hasPseudoContent(el: Element, pseudo: ":before" | ":after"): boolean {
+  const content = getComputedStyle(el, pseudo).content;
+  return !!content && content !== "none" && content !== "normal";
+}
+
+/**
+ * Materializes ::before/::after content as real child spans (html-to-image's
+ * approach) so the serialized XML clone renders them. Computed styles of the
+ * pseudo element are copied onto the span; `content` is rendered as text
+ * because the `content` property has no effect on real elements.
+ */
+function inlinePseudoElements(source: Element, clone: Element): void {
+  if (!(source instanceof HTMLElement) || !(clone instanceof HTMLElement)) return;
+
+  const children = source.children;
+  const cloneChildren = clone.children;
+  if (children.length !== cloneChildren.length) return;
+  for (let i = 0; i < children.length; i++) {
+    inlinePseudoElements(children[i], cloneChildren[i]);
+  }
+
+  if (hasPseudoContent(source, ":before")) {
+    const style = getComputedStyle(source, ":before");
+    const span = document.createElement("span");
+    span.style.cssText = style.cssText;
+    span.textContent = style.content.replace(/^["']|["']$/g, "");
+    clone.insertBefore(span, clone.firstChild);
+  }
+  if (hasPseudoContent(source, ":after")) {
+    const style = getComputedStyle(source, ":after");
+    const span = document.createElement("span");
+    span.style.cssText = style.cssText;
+    span.textContent = style.content.replace(/^["']|["']$/g, "");
+    clone.appendChild(span);
+  }
+}
+
+/** True when the stage embeds images foreignObject rasterization can't fetch. */
+function stageHasExternalImages(): boolean {
+  return Array.from(stageEl.querySelectorAll("img")).some((img) => {
+    const src = img.getAttribute("src") ?? "";
+    return !!src && !src.startsWith("data:") && !src.startsWith("blob:");
+  });
+}
+
+function buildStageSvg(): string {
+  const css = collectCSS().replace(/<\/(style)/gi, "<\\/$1");
+  const clone = stageEl.cloneNode(true) as Element;
+  inlinePseudoElements(stageEl, clone);
+  const inner = new XMLSerializer().serializeToString(clone);
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${stage.width}" height="${stage.height}">` +
+    `<style>${css}</style>` +
+    `<foreignObject width="100%" height="100%">${inner}</foreignObject>` +
+    `</svg>`
+  );
+}
+
+function loadImageFromSvg(svg: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(
+      new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
+    );
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("stage rasterization failed"));
+    };
+    img.src = url;
+  });
+}
+
+const supportsBitmapCapture =
+  typeof OffscreenCanvas !== "undefined" &&
+  typeof createImageBitmap === "function" &&
+  typeof XMLSerializer !== "undefined";
+
 async function captureFrame(frameId: number): Promise<void> {
+  const t0 = Date.now();
+
+  if (supportsBitmapCapture && !stageHasExternalImages()) {
+    try {
+      const img = await loadImageFromSvg(buildStageSvg());
+      const canvas = new OffscreenCanvas(stage.width, stage.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("2d context unavailable");
+      ctx.drawImage(img, 0, 0, stage.width, stage.height);
+      const bitmap = await createImageBitmap(canvas);
+      post(
+        {
+          type: "FRAME",
+          frameId,
+          width: stage.width,
+          height: stage.height,
+          bitmap,
+          captureMs: Date.now() - t0,
+        },
+        [bitmap],
+      );
+      return;
+    } catch (error) {
+      console.error("[runtime] fast capture failed; falling back to toPng", error);
+    }
+  }
+
+  // Fallback: html-to-image (handles external images via inlining).
   const prevRAF = window.requestAnimationFrame;
   const prevCancel = window.cancelAnimationFrame;
   window.requestAnimationFrame = nativeRequestAnimationFrame;
@@ -303,7 +455,14 @@ async function captureFrame(frameId: number): Promise<void> {
         setTimeout(() => reject(new Error("toPng timed out")), 10000),
       ),
     ]);
-    post({ type: "FRAME", frameId, dataURL, width: stage.width, height: stage.height });
+    post({
+      type: "FRAME",
+      frameId,
+      dataURL,
+      width: stage.width,
+      height: stage.height,
+      captureMs: Date.now() - t0,
+    });
   } catch (error) {
     console.error("[runtime] capture failed", error);
     reportError("RUNTIME_ERROR", new Error(
@@ -319,8 +478,8 @@ async function captureFrame(frameId: number): Promise<void> {
 // Messaging
 // ---------------------------------------------------------------------------
 
-function post(message: RuntimeMessage): void {
-  window.parent?.postMessage(message, "*");
+function post(message: RuntimeMessage, transfer?: Transferable[]): void {
+  window.parent?.postMessage(message, "*", transfer ?? []);
 }
 
 function handle(message: ParentMessage): void {
