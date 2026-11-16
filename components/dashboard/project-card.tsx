@@ -207,7 +207,7 @@ function ProjectCard({
             onOpen();
           }
         }}
-        className={`cursor-pointer rounded-lg border border-border bg-card outline-none transition-colors hover:border-muted-foreground/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 ${
+        className={`cursor-pointer overflow-hidden rounded-lg border border-border bg-card outline-none transition-colors hover:border-muted-foreground/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 ${
           isList ? "flex items-center gap-3 p-2" : ""
         }`}
       >
