@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import Editor, {
   loader,
   type Monaco,
@@ -65,6 +65,50 @@ export interface CodeEditorPaneProps {
 /** The TypeScript service namespace (top-level in monaco-editor 0.57 ESM). */
 type MonacoTypescriptApi = typeof import("monaco-editor")["typescript"];
 
+// ---------------------------------------------------------------------------
+// Error boundary that recovers from transient Monaco lifecycle crashes
+// (e.g. "InstantiationService has been disposed") by recreating the editor.
+// Bounded to a few attempts to avoid infinite remount loops.
+// ---------------------------------------------------------------------------
+interface EditorErrorBoundaryProps {
+  children: React.ReactNode;
+  onReset: () => void;
+  hasError: boolean;
+}
+interface EditorErrorBoundaryState {
+  hasError: boolean;
+}
+class EditorErrorBoundary extends Component<
+  EditorErrorBoundaryProps,
+  EditorErrorBoundaryState
+> {
+  state: EditorErrorBoundaryState = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("[code-editor-pane] editor crashed:", error);
+    this.props.onReset();
+  }
+  componentDidUpdate(prevProps: EditorErrorBoundaryProps) {
+    if (prevProps.children !== this.props.children && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <span className="font-mono text-xs text-muted-foreground">
+            Reloading editor…
+          </span>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function CodeEditorPane({
   value,
   onChange,
@@ -75,12 +119,9 @@ export function CodeEditorPane({
   const editorRef = useRef<{
     reveal: (line: number, column: number) => void;
   } | null>(null);
-  // The bundled monaco must be registered with `loader.config` BEFORE the
-  // <Editor> mounts: otherwise the loader falls back to loading a CDN copy
-  // of monaco (different version, no local-first guarantee) while our
-  // dynamic import is still in flight, and `onMount` can receive an
-  // instance without the TypeScript language service.
   const [monacoReady, setMonacoReady] = useState(false);
+  const [remountKey, setRemountKey] = useState(0);
+  const [crashCount, setCrashCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,58 +142,61 @@ export function CodeEditorPane({
   }, [revealLine]);
 
   const handleMount: OnMount = (editor, monacoInstance: Monaco) => {
-    editorRef.current = {
-      reveal: (line, column) => {
-        // The editor instance can be disposed underneath this closure (e.g.
-        // unmounted mid-reveal during hot reload); degrade to a no-op instead
-        // of throwing "InstantiationService has been disposed".
-        try {
-          editor.revealLineInCenter(line);
-          editor.setPosition({ lineNumber: line, column });
-          editor.focus();
-        } catch (error) {
-          console.warn("[code-editor-pane] reveal skipped:", error);
-        }
-      },
-    };
+    try {
+      editorRef.current = {
+        reveal: (line, column) => {
+          try {
+            editor.revealLineInCenter(line);
+            editor.setPosition({ lineNumber: line, column });
+            editor.focus();
+          } catch (error) {
+            console.warn("[code-editor-pane] reveal skipped:", error);
+          }
+        },
+      };
 
-    // monaco-editor 0.57's ESM entry exposes the TypeScript service as a
-    // top-level namespace (`monaco.typescript`); older builds attached it to
-    // `languages.typescript`. Accept both.
-    const ts =
-      (monacoInstance as unknown as { typescript?: MonacoTypescriptApi })
-        .typescript ??
-      (monacoInstance.languages as unknown as {
-        typescript?: MonacoTypescriptApi;
-      } | null)?.typescript;
-    if (!ts) {
-      console.error(
-        "[code-editor-pane] monaco instance lacks the TypeScript language service; skipping TS configuration",
-      );
-      return;
+      const ts =
+        (monacoInstance as unknown as { typescript?: MonacoTypescriptApi })
+          .typescript ??
+        (monacoInstance.languages as unknown as {
+          typescript?: MonacoTypescriptApi;
+        } | null)?.typescript;
+      if (!ts) {
+        console.error(
+          "[code-editor-pane] monaco instance lacks the TypeScript language service; skipping TS configuration",
+        );
+        return;
+      }
+      ts.typescriptDefaults.setCompilerOptions({
+        target: ts.ScriptTarget.ESNext,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeJs,
+        jsx: ts.JsxEmit.ReactJSX,
+        allowNonTsExtensions: true,
+        noEmit: true,
+        esModuleInterop: true,
+      });
+      ts.typescriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
+      ts.typescriptDefaults.setEagerModelSync(true);
+
+      for (const lib of EXTRA_LIBS) {
+        ts.typescriptDefaults.addExtraLib(
+          lib.content,
+          `file:///node_modules/${lib.path}`,
+        );
+      }
+    } catch (e) {
+      console.error("[code-editor-pane] handleMount threw:", e);
     }
-    ts.typescriptDefaults.setCompilerOptions({
-      target: ts.ScriptTarget.ESNext,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-      jsx: ts.JsxEmit.ReactJSX,
-      allowNonTsExtensions: true,
-      noEmit: true,
-      esModuleInterop: true,
-    });
-    ts.typescriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-    });
-    ts.typescriptDefaults.setEagerModelSync(true);
+  };
 
-    // Register runtime stubs so developer tooling inside the product matches
-    // what the sandbox runtime actually provides.
-    for (const lib of EXTRA_LIBS) {
-      ts.typescriptDefaults.addExtraLib(
-        lib.content,
-        `file:///node_modules/${lib.path}`,
-      );
+  const handleError = () => {
+    if (crashCount < 3) {
+      setCrashCount((c) => c + 1);
+      setRemountKey((k) => k + 1);
     }
   };
 
@@ -166,51 +210,68 @@ export function CodeEditorPane({
     );
   }
 
-  return (
-    <Editor
-      theme="vs-dark"
-      language="typescript"
-      // A .tsx model path is required so the language service parses JSX
-      // with proper TSX semantics (default models get plain .ts rules).
-      path="file:///Animation.tsx"
-      // Keep the model alive when this pane unmounts (e.g. navigating to the
-      // export screen): the library's default cleanup disposes the model
-      // before the editor, which schedules a final render into monaco's
-      // global rendering coordinator — that animation frame then fires
-      // against the disposed view and throws intermittently. Keeping the
-      // model also preserves undo history and cursor across remounts; the
-      // library reuses it via the fixed model path above.
-      keepCurrentModel
-      value={value}
-      onChange={onChange}
-      onMount={handleMount}
-      loading={
+  if (crashCount >= 3) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2">
         <span className="font-mono text-xs text-muted-foreground">
-          Loading editor…
+          Editor failed to load.
         </span>
-      }
-      options={{
-        readOnly,
-        fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
-        fontSize: 13,
-        lineHeight: 20,
-        minimap: { enabled: false },
-        wordWrap: wordWrap ? "on" : "off",
-        scrollBeyondLastLine: false,
-        smoothScrolling: true,
-        padding: { top: 12, bottom: 12 },
-        renderLineHighlight: "none",
-        scrollbar: {
-          verticalScrollbarSize: 10,
-          horizontalScrollbarSize: 10,
-          useShadows: false,
-        },
-        automaticLayout: true,
-        tabSize: 2,
-        insertSpaces: true,
-        bracketPairColorization: { enabled: true },
-        stickyScroll: { enabled: false },
-      }}
-    />
+        <button
+          type="button"
+          className="font-mono text-xs text-brand hover:underline"
+          onClick={() => {
+            setCrashCount(0);
+            setRemountKey((k) => k + 1);
+          }}
+        >
+          Reload editor
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <EditorErrorBoundary
+      onReset={handleError}
+      hasError={crashCount > 0 && crashCount < 3}
+    >
+      <Editor
+        key={remountKey}
+        theme="vs-dark"
+        language="typescript"
+        path="file:///Animation.tsx"
+        keepCurrentModel
+        value={value}
+        onChange={onChange}
+        onMount={handleMount}
+        loading={
+          <span className="font-mono text-xs text-muted-foreground">
+            Loading editor…
+          </span>
+        }
+        options={{
+          readOnly,
+          fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+          fontSize: 13,
+          lineHeight: 20,
+          minimap: { enabled: false },
+          wordWrap: wordWrap ? "on" : "off",
+          scrollBeyondLastLine: false,
+          smoothScrolling: true,
+          padding: { top: 12, bottom: 12 },
+          renderLineHighlight: "none",
+          scrollbar: {
+            verticalScrollbarSize: 10,
+            horizontalScrollbarSize: 10,
+            useShadows: false,
+          },
+          automaticLayout: true,
+          tabSize: 2,
+          insertSpaces: true,
+          bracketPairColorization: { enabled: true },
+          stickyScroll: { enabled: false },
+        }}
+      />
+    </EditorErrorBoundary>
   );
 }
