@@ -313,10 +313,12 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
 
         <div className="ml-auto flex items-center gap-1">
           <Popover>
-            <PopoverTrigger>
-              <Button variant="outline" size="sm" aria-label="Project settings">
-                <Settings />
-              </Button>
+            <PopoverTrigger
+              render={
+                <Button variant="outline" size="sm" aria-label="Project settings" />
+              }
+            >
+              <Settings />
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64">
               <div className="space-y-3">
