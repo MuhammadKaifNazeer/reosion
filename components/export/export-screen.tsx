@@ -65,6 +65,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ExportSummary | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const videoBlobRef = useRef<Blob | null>(null);
 
   // Capture plumbing
@@ -495,6 +496,7 @@ export function ExportScreen({ projectId }: { projectId: string }) {
               <h1 className="text-sm font-medium text-foreground">
                 Export complete
               </h1>
+
               <video
                 src={videoUrl}
                 className="mt-4 w-full rounded-md bg-black"
@@ -505,54 +507,35 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 muted
                 playsInline
               />
-              <dl className="mt-3 space-y-1 font-mono text-[10px] text-muted-foreground">
-                <div className="flex justify-between">
-                  <dt>File</dt>
-                  <dd className="text-foreground">
-                    {(project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "animation")}.mp4
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Resolution</dt>
-                  <dd className="text-foreground">{outWidth} × {outHeight}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Frame rate</dt>
-                  <dd className="text-foreground">{project.fps} FPS</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Duration</dt>
-                  <dd className="text-foreground">{project.duration}s</dd>
-                </div>
-                {summary ? (
-                  <>
-                    <div className="flex justify-between">
-                      <dt>Encoder</dt>
-                      <dd className="text-foreground">{summary.engine}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>Frames</dt>
-                      <dd className="text-foreground">{summary.frames}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>Avg capture</dt>
-                      <dd className="text-foreground">{summary.avgCaptureMs}ms / frame</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>First frame</dt>
-                      <dd className="text-foreground">{summary.firstFrameMs}ms</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>Finalize</dt>
-                      <dd className="text-foreground">{summary.finalizeMs}ms</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt>Total</dt>
-                      <dd className="text-foreground">{(summary.totalMs / 1000).toFixed(1)}s</dd>
-                    </div>
-                  </>
-                ) : null}
-              </dl>
+
+              {/* Primary identity: filename */}
+              <p className="mt-3 truncate font-mono text-xs text-foreground">
+                {(project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "animation")}.mp4
+              </p>
+
+              {/* Compact metadata line */}
+              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                {outWidth} × {outHeight} · {project.fps} FPS · {project.duration}s
+              </p>
+              {summary ? (
+                <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  {summary.engine.split("·").pop()?.trim() ?? summary.codec} ·{" "}
+                  {summary.frames} frames
+                </p>
+              ) : null}
+
+              {/* Render performance, concise */}
+              {summary ? (
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                  Render time: {(summary.totalMs / 1000).toFixed(1)}s
+                  {summary.totalMs < project.duration * 1000
+                    ? " · Faster than realtime"
+                    : summary.totalMs > project.duration * 1000
+                      ? " · Slower than realtime"
+                      : ""}
+                </p>
+              ) : null}
+
               <div className="mt-5 flex gap-2">
                 <Button
                   className="flex-1"
@@ -573,24 +556,99 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
-                    setPhase("settings");
-                    setVideoUrl(null);
-                    setProgress(0);
-                  }}
+                  render={<Link href={`/projects/${encoded}`} />}
                 >
-                  <RotateCcw />
-                  Export again
+                  Back to editor
                 </Button>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="mt-2 w-full"
-                render={<Link href={`/projects/${encoded}`} />}
+                onClick={() => {
+                  setPhase("settings");
+                  setVideoUrl(null);
+                  setProgress(0);
+                  setDetailsOpen(false);
+                }}
               >
-                Back to editor
+                <RotateCcw />
+                Export again
               </Button>
+
+              {/* Technical details accordion (collapsed by default) */}
+              {summary ? (
+                <div className="mt-4 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    aria-expanded={detailsOpen}
+                    aria-controls="render-details-panel"
+                    onClick={() => setDetailsOpen((v) => !v)}
+                    className="flex w-full items-center gap-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-block w-3 text-center transition-transform duration-150"
+                      style={{
+                        transform: detailsOpen ? "rotate(90deg)" : "rotate(0deg)",
+                      }}
+                    >
+                      ▸
+                    </span>
+                    Render details
+                  </button>
+                  <div
+                    id="render-details-panel"
+                    className="grid transition-[grid-template-rows] duration-200 ease-out"
+                    style={{
+                      gridTemplateRows: detailsOpen ? "1fr" : "0fr",
+                    }}
+                  >
+                    <div className="overflow-hidden">
+                      <dl className="mt-2 space-y-1 font-mono text-[10px] text-muted-foreground">
+                        <div className="flex justify-between">
+                          <dt>Total render time</dt>
+                          <dd className="text-foreground">
+                            {(summary.totalMs / 1000).toFixed(1)}s
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>Average capture</dt>
+                          <dd className="text-foreground">
+                            {summary.avgCaptureMs}ms / frame
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>First frame</dt>
+                          <dd className="text-foreground">
+                            {summary.firstFrameMs}ms
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>Finalize</dt>
+                          <dd className="text-foreground">
+                            {summary.finalizeMs}ms
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>Frames</dt>
+                          <dd className="text-foreground">{summary.frames}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>Encoder</dt>
+                          <dd className="text-foreground">{summary.engine}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>File size</dt>
+                          <dd className="text-foreground">
+                            {(summary.bytes / (1024 * 1024)).toFixed(2)} MB
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : phase === "error" ? (
             <div className="rounded-lg border border-destructive/40 bg-card p-5">
