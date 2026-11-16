@@ -374,7 +374,12 @@ function stageHasExternalImages(): boolean {
 }
 
 function buildStageSvg(): string {
-  const css = collectCSS().replace(/<\/(style)/gi, "<\\/$1");
+  // The <style> content is XML text: escape `&` and `<` (Tailwind v4 emits
+  // nesting selectors like `&:hover` and `@media (...) { & { ... } }`). The
+  // parser decodes the entities back to the original CSS when rasterizing.
+  const css = collectCSS()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;");
   const clone = stageEl.cloneNode(true) as Element;
   inlinePseudoElements(stageEl, clone);
   const inner = new XMLSerializer().serializeToString(clone);
@@ -390,7 +395,15 @@ function loadImageFromSvg(svg: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("stage rasterization failed"));
+    img.onerror = () => {
+      // Data-URL SVG images fail to decode when the serialized XML is
+      // malformed; log a sample so the shape of the failure is visible.
+      console.error(
+        `[runtime] svg raster rejected (len=${svg.length}) sample:`,
+        svg.slice(0, 1200),
+      );
+      reject(new Error("stage rasterization failed"));
+    };
     // A data: URL (not a blob: URL) is required: images loaded from blob
     // URLs taint canvases in opaque-origin (sandboxed) documents, which
     // makes the produced ImageBitmap impossible to transfer. data: URLs

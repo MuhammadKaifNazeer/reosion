@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor, {
   loader,
   type Monaco,
@@ -50,13 +50,6 @@ function configure() {
 // Guard: this module is also evaluated during SSR; workers only apply to the browser.
 if (typeof window !== "undefined") {
   configure();
-
-  // loader.config needs the monaco instance; do it lazily on module load so the
-  // heavy editor chunk stays out of the main bundle.
-  void (async () => {
-    const monaco = await import("monaco-editor");
-    loader.config({ monaco });
-  })();
 }
 
 export interface CodeEditorPaneProps {
@@ -69,6 +62,9 @@ export interface CodeEditorPaneProps {
   wordWrap?: boolean;
 }
 
+/** The TypeScript service namespace (top-level in monaco-editor 0.57 ESM). */
+type MonacoTypescriptApi = typeof import("monaco-editor")["typescript"];
+
 export function CodeEditorPane({
   value,
   onChange,
@@ -79,6 +75,24 @@ export function CodeEditorPane({
   const editorRef = useRef<{
     reveal: (line: number, column: number) => void;
   } | null>(null);
+  // The bundled monaco must be registered with `loader.config` BEFORE the
+  // <Editor> mounts: otherwise the loader falls back to loading a CDN copy
+  // of monaco (different version, no local-first guarantee) while our
+  // dynamic import is still in flight, and `onMount` can receive an
+  // instance without the TypeScript language service.
+  const [monacoReady, setMonacoReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const monaco = await import("monaco-editor");
+      loader.config({ monaco });
+      if (!cancelled) setMonacoReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (revealLine) {
@@ -95,9 +109,23 @@ export function CodeEditorPane({
       },
     };
 
-    const ts = monacoInstance.languages.typescript;
+    // monaco-editor 0.57's ESM entry exposes the TypeScript service as a
+    // top-level namespace (`monaco.typescript`); older builds attached it to
+    // `languages.typescript`. Accept both.
+    const ts =
+      (monacoInstance as unknown as { typescript?: MonacoTypescriptApi })
+        .typescript ??
+      (monacoInstance.languages as unknown as {
+        typescript?: MonacoTypescriptApi;
+      } | null)?.typescript;
+    if (!ts) {
+      console.error(
+        "[code-editor-pane] monaco instance lacks the TypeScript language service; skipping TS configuration",
+      );
+      return;
+    }
     ts.typescriptDefaults.setCompilerOptions({
-      target: ts.ScriptTarget.ES2022,
+      target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.NodeJs,
       jsx: ts.JsxEmit.ReactJSX,
@@ -120,6 +148,16 @@ export function CodeEditorPane({
       );
     }
   };
+
+  if (!monacoReady) {
+    return (
+      <div className="flex items-center justify-center">
+        <span className="font-mono text-xs text-muted-foreground">
+          Loading editor…
+        </span>
+      </div>
+    );
+  }
 
   return (
     <Editor
