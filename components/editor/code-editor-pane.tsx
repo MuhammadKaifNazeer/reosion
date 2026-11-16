@@ -103,9 +103,16 @@ export function CodeEditorPane({
   const handleMount: OnMount = (editor, monacoInstance: Monaco) => {
     editorRef.current = {
       reveal: (line, column) => {
-        editor.revealLineInCenter(line);
-        editor.setPosition({ lineNumber: line, column });
-        editor.focus();
+        // The editor instance can be disposed underneath this closure (e.g.
+        // unmounted mid-reveal during hot reload); degrade to a no-op instead
+        // of throwing "InstantiationService has been disposed".
+        try {
+          editor.revealLineInCenter(line);
+          editor.setPosition({ lineNumber: line, column });
+          editor.focus();
+        } catch (error) {
+          console.warn("[code-editor-pane] reveal skipped:", error);
+        }
       },
     };
 
@@ -166,6 +173,14 @@ export function CodeEditorPane({
       // A .tsx model path is required so the language service parses JSX
       // with proper TSX semantics (default models get plain .ts rules).
       path="file:///Animation.tsx"
+      // Keep the model alive when this pane unmounts (e.g. navigating to the
+      // export screen): the library's default cleanup disposes the model
+      // before the editor, which schedules a final render into monaco's
+      // global rendering coordinator — that animation frame then fires
+      // against the disposed view and throws intermittently. Keeping the
+      // model also preserves undo history and cursor across remounts; the
+      // library reuses it via the fixed model path above.
+      keepCurrentModel
       value={value}
       onChange={onChange}
       onMount={handleMount}
