@@ -12,6 +12,7 @@
     "build:runtime": "node scripts/build-runtime.mjs"
   },
   "dependencies": {
+    "@animate-ui/react": "^2.4.6",
     "@base-ui/react": "^1.9.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
