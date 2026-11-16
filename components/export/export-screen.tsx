@@ -508,34 +508,52 @@ export function ExportScreen({ projectId }: { projectId: string }) {
                 playsInline
               />
 
-              {/* Primary identity: filename */}
-              <p className="mt-3 truncate font-mono text-xs text-foreground">
-                {(project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "animation")}.mp4
-              </p>
-
-              {/* Compact metadata line */}
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                {outWidth} × {outHeight} · {project.fps} FPS · {project.duration}s
-              </p>
-              {summary ? (
-                <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                  {summary.engine.split("·").pop()?.trim() ?? summary.codec} ·{" "}
-                  {summary.frames} frames
-                </p>
-              ) : null}
-
-              {/* Render performance, concise */}
-              {summary ? (
-                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                  Render time: {(summary.totalMs / 1000).toFixed(1)}s
-                  {summary.totalMs < project.duration * 1000
-                    ? " · Faster than realtime"
-                    : summary.totalMs > project.duration * 1000
-                      ? " · Slower than realtime"
-                      : ""}
-                </p>
-              ) : null}
-
+              {/* Structured export metadata (label/value rows) */}
+              <dl className="mt-3 space-y-1 font-mono text-[10px] text-muted-foreground">
+                <div className="flex justify-between gap-4">
+                  <dt>File</dt>
+                  <dd className="truncate text-foreground">
+                    {(project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "animation")}.mp4
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Resolution</dt>
+                  <dd className="text-foreground">{outWidth} × {outHeight}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Frame rate</dt>
+                  <dd className="text-foreground">{project.fps} FPS</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Duration</dt>
+                  <dd className="text-foreground">{project.duration}s</dd>
+                </div>
+                {summary ? (
+                  <>
+                    <div className="flex justify-between">
+                      <dt>Format</dt>
+                      <dd className="text-foreground">
+                        {summary.engine.split("·").pop()?.trim() ?? summary.codec}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Frames</dt>
+                      <dd className="text-foreground">{summary.frames}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Render time</dt>
+                      <dd className="text-foreground">
+                        {(summary.totalMs / 1000).toFixed(1)}s
+                        {summary.totalMs < project.duration * 1000
+                          ? " · Faster than realtime"
+                          : summary.totalMs > project.duration * 1000
+                            ? " · Slower than realtime"
+                            : ""}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
+              </dl>
               <div className="mt-5 flex gap-2">
                 <Button
                   className="flex-1"
