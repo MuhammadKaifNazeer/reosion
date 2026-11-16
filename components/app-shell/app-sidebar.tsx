@@ -121,42 +121,45 @@ export function AppSidebar() {
               external={"external" in item && item.external}
             />
           ))}
-          <div
-            className={cn(
-              "mt-1 flex items-center gap-2 rounded-md px-2 py-1.5",
-              !expanded && "justify-center px-0",
-            )}
-          >
-            <span
-              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-muted-foreground"
-              aria-hidden
-            >
-              <UserRound className="size-3.5" />
-            </span>
-            {expanded ? (
-              <span className="truncate text-xs text-muted-foreground">
-                Local user
-              </span>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className={cn(
-                "ml-auto text-muted-foreground",
-                !expanded && "ml-0",
-              )}
-              aria-label="Toggle theme"
-              onClick={() =>
-                setTheme(resolvedTheme === "dark" ? "light" : "dark")
-              }
-            >
-              {mounted && resolvedTheme === "dark" ? (
-                <Sun className="size-3.5" />
-              ) : (
-                <Moon className="size-3.5" />
-              )}
-            </Button>
-          </div>
+           <div
+             className={cn(
+               "mt-1 flex items-center gap-2 rounded-md px-2 py-1.5",
+               !expanded && "flex-col justify-center gap-1 px-0",
+             )}
+           >
+             <Button
+               variant="ghost"
+               size="icon-sm"
+               className={cn(
+                 "text-muted-foreground",
+                 expanded ? "ml-auto order-3" : "ml-0 order-1",
+               )}
+               aria-label="Toggle theme"
+               onClick={() =>
+                 setTheme(resolvedTheme === "dark" ? "light" : "dark")
+               }
+             >
+               {mounted && resolvedTheme === "dark" ? (
+                 <Sun className="size-3.5" />
+               ) : (
+                 <Moon className="size-3.5" />
+               )}
+             </Button>
+             <span
+               className={cn(
+                 "flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-muted-foreground",
+                 !expanded && "order-2",
+               )}
+               aria-hidden
+             >
+               <UserRound className="size-3.5" />
+             </span>
+             {expanded ? (
+               <span className="truncate text-xs text-muted-foreground">
+                 Local user
+               </span>
+             ) : null}
+           </div>
         </div>
       </nav>
     </aside>
