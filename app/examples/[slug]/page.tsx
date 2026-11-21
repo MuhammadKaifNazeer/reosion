@@ -132,6 +132,7 @@ function ExampleViewer() {
                       } catch {
                         /* ignore */
                       }
+                      clock.seek(0);
                     } catch (e) {
                       console.error("example thumbnail capture failed", e);
                     }

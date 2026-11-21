@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { ExamplesGrid } from "@/components/examples/examples-grid";
@@ -14,10 +14,32 @@ export default function ExamplesPage() {
           <Link href="/" className="flex items-center gap-2 text-foreground">
             <span className="font-semibold tracking-tight">Reosion</span>
           </Link>
-          <div className="ml-auto">
-            <Button variant="ghost" size="sm" render={<Link href="/" />}>
-              <ArrowLeft />
-              Back
+          <nav className="ml-4 hidden items-center gap-5 text-sm text-muted-foreground md:flex">
+            <Link className="transition-colors hover:text-foreground" href="/examples">
+              Examples
+            </Link>
+            <a className="transition-colors hover:text-foreground" href="/#features">
+              Features
+            </a>
+            <a className="transition-colors hover:text-foreground" href="/#local-first">
+              Local-first
+            </a>
+            <a className="transition-colors hover:text-foreground" href="/#ai">
+              AI
+            </a>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              render={
+                <a href="https://github.com/MuhammadKaifNazeer/reosion" target="_blank" rel="noreferrer" />
+              }
+            >
+              GitHub
+            </Button>
+            <Button size="sm" render={<Link href="/dashboard" />}>
+              Start creating
             </Button>
           </div>
         </div>

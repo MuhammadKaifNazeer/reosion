@@ -595,6 +595,8 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
                             thumbnail: thumb,
                           });
                           setProject(updated);
+                          // Return playback to the start after capturing.
+                          clock.seek(0);
                         } catch (e) {
                           console.error("thumbnail capture failed", e);
                         }

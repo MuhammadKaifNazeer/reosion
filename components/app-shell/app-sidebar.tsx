@@ -7,6 +7,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
+  FileCode2,
   LayoutDashboard,
   Settings,
   UserRound,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: FileCode2, label: "Examples", href: "/examples" },
 ] as const;
 
 const FOOTER_ITEMS = [

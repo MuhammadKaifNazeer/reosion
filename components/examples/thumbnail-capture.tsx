@@ -64,6 +64,7 @@ export function ThumbnailCapture({
             } catch {
               /* ignore */
             }
+            clock.seek(0);
             onCaptured(example.slug, thumb);
           } catch {
             /* ignore */

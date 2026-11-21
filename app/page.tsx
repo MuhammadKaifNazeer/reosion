@@ -119,6 +119,9 @@ export default function LandingPage() {
             <Wordmark />
           </div>
           <nav className="ml-4 hidden items-center gap-5 text-sm text-muted-foreground md:flex">
+            <Link className="transition-colors hover:text-foreground" href="/examples">
+              Examples
+            </Link>
             <a className="transition-colors hover:text-foreground" href="#features">
               Features
             </a>
@@ -297,7 +300,9 @@ export default function LandingPage() {
                 <ArrowRight />
               </Button>
             </div>
-            <ExamplesGrid limit={6} />
+            <div className="mt-10">
+              <ExamplesGrid limit={6} />
+            </div>
           </div>
         </section>
 
