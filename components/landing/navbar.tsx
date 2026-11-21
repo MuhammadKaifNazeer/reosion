@@ -13,7 +13,7 @@ const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 export function LandingNavbar() {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-6 px-6 py-2">
         <Link href="/" className="flex items-center gap-2 text-foreground">
           <Logo />
           <Wordmark />
