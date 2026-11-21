@@ -20,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { EXAMPLES } from "@/lib/examples";
+import { ExamplesGrid } from "@/components/examples/examples-grid";
 
 const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 
@@ -297,25 +297,7 @@ export default function LandingPage() {
                 <ArrowRight />
               </Button>
             </div>
-            <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {EXAMPLES.slice(0, 6).map((example) => (
-                <Link
-                  key={example.slug}
-                  href={"/examples/" + example.slug}
-                  className="group rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40"
-                >
-                  <p className="text-sm font-medium text-foreground">
-                    {example.title}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {example.description}
-                  </p>
-                  <span className="mt-3 inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground group-hover:text-foreground">
-                    Open <ArrowRight className="size-3" />
-                  </span>
-                </Link>
-              ))}
-            </div>
+            <ExamplesGrid limit={6} />
           </div>
         </section>
 

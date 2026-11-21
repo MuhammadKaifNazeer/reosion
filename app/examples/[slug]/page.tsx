@@ -13,6 +13,8 @@ import { useClockDriver } from "@/components/runtime/use-clock-driver";
 import { AnimationClockController } from "@/lib/clock/clock";
 import { getStorage } from "@/lib/projects/storage";
 import { findExample, exampleToProject } from "@/lib/examples";
+import { downscaleDataURL } from "@/lib/thumbnails/downscale";
+import { bitmapToDataURL } from "@/lib/export/canvas";
 import type { Project } from "@/lib/types";
 
 import { Suspense } from "react";
@@ -24,6 +26,8 @@ function ExampleViewer() {
   const [project, setProject] = useState<Project | null>(null);
   const [clock, setClock] = useState<AnimationClockController | null>(null);
   const [remixing, setRemixing] = useState(false);
+  const [captureRequested, setCaptureRequested] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!example) return;
@@ -33,6 +37,15 @@ function ExampleViewer() {
   }, [example]);
 
   useClockDriver(clock ?? new AnimationClockController(1, 30));
+
+  useEffect(() => {
+    if (!clock || !ready) return;
+    const h = setTimeout(() => {
+      clock.seek(example!.duration * 0.15);
+      setCaptureRequested(true);
+    }, 400);
+    return () => clearTimeout(h);
+  }, [clock, ready, example]);
 
   async function remix() {
     if (!example) return;
@@ -99,7 +112,31 @@ function ExampleViewer() {
               style={{ width: Math.round(project.width * scale), height: Math.round(project.height * scale) }}
             >
               <div style={{ width: project.width, height: project.height, transform: "scale(" + scale + ")", transformOrigin: "top left" }}>
-                <PreviewRuntime project={project} clock={clock} />
+                <PreviewRuntime
+                  project={project}
+                  clock={clock}
+                  onRuntimeStatus={(s) => {
+                    if (s.kind === "ready") setReady(true);
+                  }}
+                  captureToken={captureRequested ? 1 : 0}
+                  onFrame={async (frame) => {
+                    setCaptureRequested(false);
+                    try {
+                      let dataURL = frame.dataURL;
+                      if (!dataURL && frame.bitmap) dataURL = await bitmapToDataURL(frame.bitmap);
+                      if (!dataURL) return;
+                      frame.bitmap?.close();
+                      const thumb = await downscaleDataURL(dataURL, 480, 0.8);
+                      try {
+                        localStorage.setItem("reosion:example-thumb:" + example!.slug, thumb);
+                      } catch {
+                        /* ignore */
+                      }
+                    } catch (e) {
+                      console.error("example thumbnail capture failed", e);
+                    }
+                  }}
+                />
               </div>
             </div>
           )}

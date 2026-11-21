@@ -178,7 +178,9 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (!project || compileStatus.kind !== "ok") return;
     const handle = window.setTimeout(() => {
-      clock.seek(0);
+      // Capture a representative frame ~15% into the animation instead of
+      // the (often blank) first frame.
+      clock.seek(project.duration * 0.15);
       setCaptureRequested(true);
     }, 500);
     return () => window.clearTimeout(handle);

@@ -185,7 +185,7 @@ export function exampleToProject(example: Example): Project {
     fps: example.fps,
     duration: example.duration,
     code: example.code,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    createdAt: 0,
+    updatedAt: 0,
   };
 }

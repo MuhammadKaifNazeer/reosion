@@ -140,6 +140,7 @@ export function PreviewRuntime({
           readyRef.current = true;
           setRuntimeLoaded(true);
           setReadyNonce((n) => n + 1);
+          statusRef.current?.({ kind: "ready" });
           break;
         }
         case "FRAME": {
