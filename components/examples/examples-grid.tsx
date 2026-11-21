@@ -33,8 +33,11 @@ export function ExamplesGrid({ limit }: { limit?: number }) {
       </ul>
       {missing ? (
         <ThumbnailCapture
+          key={missing.slug}
           example={missing}
-          onCaptured={(slug, url) => setThumbs((prev) => ({ ...prev, [slug]: url }))}
+          onCaptured={(slug, url) => {
+            setThumbs((prev) => ({ ...prev, [slug]: url }));
+          }}
         />
       ) : null}
     </>

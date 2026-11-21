@@ -119,13 +119,22 @@ export default function LandingPage() {
             <Wordmark />
           </div>
           <nav className="ml-4 hidden items-center gap-5 text-sm text-muted-foreground md:flex">
-            <Link className="transition-colors hover:text-foreground" href="/examples">
+            <Link
+              className="transition-colors hover:text-foreground"
+              href="/examples"
+            >
               Examples
             </Link>
-            <a className="transition-colors hover:text-foreground" href="#features">
+            <a
+              className="transition-colors hover:text-foreground"
+              href="#features"
+            >
               Features
             </a>
-            <a className="transition-colors hover:text-foreground" href="#local-first">
+            <a
+              className="transition-colors hover:text-foreground"
+              href="#local-first"
+            >
               Local-first
             </a>
             <a className="transition-colors hover:text-foreground" href="#ai">
@@ -135,9 +144,7 @@ export default function LandingPage() {
           <div className="ml-auto flex items-center gap-2">
             <Button
               variant="ghost"
-              render={
-                <a href={REPO_URL} target="_blank" rel="noreferrer" />
-              }
+              render={<a href={REPO_URL} target="_blank" rel="noreferrer" />}
             >
               <GithubMark />
               GitHub
@@ -167,19 +174,14 @@ export default function LandingPage() {
               instantly. Export to video — on your machine, for free, forever.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button
-                size="lg"
-                render={<Link href="/dashboard" />}
-              >
+              <Button size="lg" render={<Link href="/dashboard" />}>
                 Start creating
                 <ArrowRight />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                render={
-                  <a href={REPO_URL} target="_blank" rel="noreferrer" />
-                }
+                render={<a href={REPO_URL} target="_blank" rel="noreferrer" />}
               >
                 <GithubMark />
                 View GitHub
@@ -205,7 +207,10 @@ export default function LandingPage() {
                 </pre>
               </div>
               <div className="hidden items-center justify-center md:flex">
-                <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
+                <ArrowRight
+                  className="size-4 text-muted-foreground"
+                  aria-hidden
+                />
               </div>
               <div className="reosion-demo relative flex h-[320px] items-center justify-center overflow-hidden bg-[#0a0a0b] p-5 md:h-[360px]">
                 <div className="relative h-full w-full max-w-[390px] overflow-hidden rounded-md border border-border/60 bg-background/40">
@@ -223,7 +228,8 @@ export default function LandingPage() {
                       <span
                         className="size-1.5 rounded-full bg-brand"
                         style={{
-                          animation: "reosion-demo-pulse 3s ease-in-out infinite",
+                          animation:
+                            "reosion-demo-pulse 3s ease-in-out infinite",
                         }}
                       />
                       Live preview
@@ -283,29 +289,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Examples */}
-        <section id="examples" className="border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 py-20">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
-                  Examples
-                </h2>
-                <p className="mt-3 max-w-xl text-muted-foreground">
-                  Six animations you can open, remix and make your own.
-                </p>
-              </div>
-              <Button variant="outline" size="sm" render={<Link href="/examples" />}>
-                Show all
-                <ArrowRight />
-              </Button>
-            </div>
-            <div className="mt-10">
-              <ExamplesGrid limit={6} />
-            </div>
-          </div>
-        </section>
-
         {/* Flow */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-6xl px-6 py-16">
@@ -327,6 +310,33 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* Examples */}
+        <section id="examples" className="border-b border-border">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                  Examples
+                </h2>
+                <p className="mt-3 max-w-xl text-muted-foreground">
+                  Six animations you can open, remix and make your own.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href="/examples" />}
+              >
+                Show all
+                <ArrowRight />
+              </Button>
+            </div>
+            <div className="mt-10">
+              <ExamplesGrid limit={6} />
+            </div>
+          </div>
+        </section>
+
         {/* Features */}
         <section id="features" className="border-b border-border">
           <div className="mx-auto max-w-6xl px-6 py-20">
@@ -341,10 +351,7 @@ export default function LandingPage() {
               {FEATURES.map((feature) => (
                 <Card key={feature.title} className="border-border bg-card">
                   <CardHeader>
-                    <feature.icon
-                      className="size-4 text-brand"
-                      aria-hidden
-                    />
+                    <feature.icon className="size-4 text-brand" aria-hidden />
                     <CardTitle className="text-sm font-medium">
                       {feature.title}
                     </CardTitle>
@@ -385,7 +392,9 @@ export default function LandingPage() {
                     <span className="text-muted-foreground">0{i + 1}</span>
                     <span className="text-foreground">{node}</span>
                     {i === PIPELINE.length - 1 ? (
-                      <span className="ml-auto text-brand">blob → download</span>
+                      <span className="ml-auto text-brand">
+                        blob → download
+                      </span>
                     ) : (
                       <ArrowRight
                         className="ml-auto size-3 text-muted-foreground"
@@ -425,7 +434,9 @@ export default function LandingPage() {
                 <p className="text-muted-foreground">proposed diff</p>
                 <pre className="tracking-tight">
                   <code className="block text-foreground">
-                    <span className="text-destructive">- initial=&#123;&#123; opacity: 0 &#125;&#125;</span>
+                    <span className="text-destructive">
+                      - initial=&#123;&#123; opacity: 0 &#125;&#125;
+                    </span>
                     {"\n"}
                     <span className="text-brand">
                       + initial=&#123;&#123; opacity: 0, x: -120 &#125;&#125;
@@ -455,19 +466,14 @@ export default function LandingPage() {
               Free, open source and running entirely on your machine.
             </p>
             <div className="mt-8 flex justify-center gap-3">
-              <Button
-                size="lg"
-                render={<Link href="/dashboard" />}
-              >
+              <Button size="lg" render={<Link href="/dashboard" />}>
                 Start creating
                 <ArrowRight />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                render={
-                  <a href={REPO_URL} target="_blank" rel="noreferrer" />
-                }
+                render={<a href={REPO_URL} target="_blank" rel="noreferrer" />}
               >
                 <GithubMark />
                 View on GitHub

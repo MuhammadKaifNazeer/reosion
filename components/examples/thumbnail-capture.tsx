@@ -25,15 +25,14 @@ export function ThumbnailCapture({
     if (!ready) return;
     const h = setTimeout(() => {
       clock.seek(0);
-    }, 200);
+    }, 100);
     const h2 = setTimeout(() => {
       setCaptureRequested(true);
-    }, 1200);
+    }, 400);
     return () => {
       clearTimeout(h);
       clearTimeout(h2);
     };
-    return () => clearTimeout(h);
   }, [ready, clock, example.duration]);
 
   return (

@@ -42,10 +42,10 @@ function ExampleViewer() {
     if (!clock || !ready) return;
     const h = setTimeout(() => {
       clock.seek(0);
-    }, 200);
+    }, 100);
     const h2 = setTimeout(() => {
       setCaptureRequested(true);
-    }, 1200);
+    }, 400);
     return () => {
       clearTimeout(h);
       clearTimeout(h2);
