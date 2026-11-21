@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { EXAMPLES } from "@/lib/examples";
 import { ExampleCard } from "@/components/examples/example-card";
 import { ThumbnailCapture } from "@/components/examples/thumbnail-capture";
 
 export function ExamplesGrid({ limit }: { limit?: number }) {
-  const [thumbs, setThumbs] = useState<Record<string, string>>({});
-
-  useEffect(() => {
+  const [thumbs, setThumbs] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
+    if (typeof window === "undefined") return initial;
     for (const ex of EXAMPLES) {
       try {
         const c = localStorage.getItem("reosion:example-thumb:" + ex.slug);
@@ -18,8 +17,8 @@ export function ExamplesGrid({ limit }: { limit?: number }) {
         /* ignore */
       }
     }
-    setThumbs(initial);
-  }, []);
+    return initial;
+  });
 
   const list = typeof limit === "number" ? EXAMPLES.slice(0, limit) : EXAMPLES;
   const missing = list.find((ex) => !thumbs[ex.slug]);
