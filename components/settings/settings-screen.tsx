@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Cpu,
   HardDrive,
-  Keyboard,
   KeyRound,
   MonitorCheck,
   Save,
@@ -212,48 +211,6 @@ export function SettingsScreen() {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Keyboard className="size-4 text-muted-foreground" />
-              Keyboard shortcuts
-            </CardTitle>
-            <CardDescription>
-              Available in the editor workspace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-9 w-40">Shortcut</TableHead>
-                  <TableHead className="h-9">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  ["⌘/Ctrl + S", "Save project"],
-                  ["⌘/Ctrl + K", "Command palette"],
-                  ["Space", "Play / pause"],
-                  ["← →", "Step one frame"],
-                  ["J / K / L", "Back / pause / forward"],
-                  ["Esc", "Close panels"],
-                ].map(([keys, label]) => (
-                  <TableRow key={keys}>
-                    <TableCell className="py-2">
-                      <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-                        {keys}
-                      </kbd>
-                    </TableCell>
-                    <TableCell className="py-2 text-muted-foreground">
-                      {label}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

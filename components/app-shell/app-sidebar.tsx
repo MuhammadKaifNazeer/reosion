@@ -29,7 +29,7 @@ const FOOTER_ITEMS = [
   {
     icon: CircleHelp,
     label: "Help",
-    href: "https://github.com",
+    href: "https://github.com/MuhammadKaifNazeer/reosion/issues",
     external: true,
   },
 ] as const;
@@ -181,7 +181,24 @@ function SidebarLink({
   expanded: boolean;
   external?: boolean;
 }) {
-  const link = (
+  const link = external ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={cn(
+        "flex h-7 items-center gap-2 rounded-md px-2 text-xs font-medium transition-colors",
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+        !expanded && "justify-center px-0",
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" />
+      {expanded ? label : null}
+      <span className="sr-only">(external link)</span>
+    </a>
+  ) : (
     <Link
       href={href}
       className={cn(
@@ -195,7 +212,6 @@ function SidebarLink({
     >
       <Icon className="size-3.5 shrink-0" />
       {expanded ? label : null}
-      {external ? <span className="sr-only">(external link)</span> : null}
     </Link>
   );
 

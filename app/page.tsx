@@ -20,6 +20,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EXAMPLES } from "@/lib/examples";
+
 const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 
 /**
@@ -195,7 +197,7 @@ export default function LandingPage() {
                     tsx
                   </span>
                 </div>
-                <pre className="h-[220px] overflow-auto p-4 font-mono text-xs leading-6 text-muted-foreground md:h-auto md:flex-1">
+                <pre className="landing-code h-[220px] overflow-auto p-4 font-mono text-xs leading-6 text-muted-foreground md:h-auto md:flex-1">
                   <code>{DEMO_CODE}</code>
                 </pre>
               </div>
@@ -274,6 +276,45 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Examples */}
+        <section id="examples" className="border-b border-border">
+          <div className="mx-auto max-w-6xl px-6 py-20">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                  Examples
+                </h2>
+                <p className="mt-3 max-w-xl text-muted-foreground">
+                  Six animations you can open, remix and make your own.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" render={<Link href="/examples" />}>
+                Show all
+                <ArrowRight />
+              </Button>
+            </div>
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {EXAMPLES.slice(0, 6).map((example) => (
+                <Link
+                  key={example.slug}
+                  href={"/examples/" + example.slug}
+                  className="group rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40"
+                >
+                  <p className="text-sm font-medium text-foreground">
+                    {example.title}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {example.description}
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground group-hover:text-foreground">
+                    Open <ArrowRight className="size-3" />
+                  </span>
+                </Link>
+              ))}
             </div>
           </div>
         </section>
