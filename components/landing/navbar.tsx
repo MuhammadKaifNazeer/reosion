@@ -6,6 +6,7 @@ import { GithubMark } from "@/components/app-shell/github-mark";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LandingThemeToggle } from "@/components/landing/theme-toggle";
+import { LandingMobileMenu } from "@/components/landing/mobile-menu";
 
 const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 
@@ -34,7 +35,7 @@ export function LandingNavbar() {
             AI
           </a>
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto hidden items-center gap-2 md:flex">
           <LandingThemeToggle />
           <Button
             variant="ghost"
@@ -49,6 +50,9 @@ export function LandingNavbar() {
             Start creating
             <ArrowRight />
           </Button>
+        </div>
+        <div className="ml-auto md:hidden">
+          <LandingMobileMenu />
         </div>
       </div>
     </header>
