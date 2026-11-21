@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Logo, Wordmark } from "@/components/app-shell/logo";
 import { GithubMark } from "@/components/app-shell/github-mark";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 
@@ -14,6 +15,9 @@ export function LandingNavbar() {
         <Link href="/" className="flex items-center gap-2 text-foreground">
           <Logo />
           <Wordmark />
+          <Badge variant="secondary" className="text-[10px]">
+            Beta
+          </Badge>
         </Link>
         <nav className="ml-4 hidden items-center gap-5 text-sm text-muted-foreground md:flex">
           <Link className="transition-colors hover:text-foreground" href="/examples">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/app-shell/logo";
+import { Badge } from "@/components/ui/badge";
 
 export function LandingFooter() {
   return (
@@ -9,6 +10,9 @@ export function LandingFooter() {
         <span className="flex items-center gap-2 text-foreground">
           <Logo size={14} />
           Reosion
+          <Badge variant="secondary" className="text-[10px]">
+            Beta
+          </Badge>
         </span>
         <span>Open source · Local-first · MIT</span>
       </div>

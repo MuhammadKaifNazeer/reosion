@@ -17,6 +17,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Logo, Wordmark } from "@/components/app-shell/logo";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -81,7 +82,14 @@ export function AppSidebar() {
       >
         <Link href="/" className="flex items-center gap-2 text-foreground">
           <Logo />
-          {expanded ? <Wordmark /> : null}
+          {expanded ? (
+            <>
+              <Wordmark />
+              <Badge variant="secondary" className="text-[10px]">
+                Beta
+              </Badge>
+            </>
+          ) : null}
         </Link>
         <Button
           variant="ghost"
