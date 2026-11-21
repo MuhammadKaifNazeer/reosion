@@ -13,7 +13,9 @@ export default function ExamplesPage() {
         <p className="my-2 max-w-xl text-muted-foreground">
           Six animations you can open, remix and make your own.
         </p>
-        <ExamplesGrid />
+        <div className="mt-10">
+          <ExamplesGrid />
+        </div>
       </main>
       <LandingFooter />
     </div>
