@@ -178,11 +178,10 @@ export function WorkspaceScreen({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (!project || compileStatus.kind !== "ok") return;
     const handle = window.setTimeout(() => {
-      // Capture a representative frame ~15% into the animation instead of
-      // the (often blank) first frame.
-      clock.seek(project.duration * 0.15);
+      // Capture a representative frame from the start of the animation.
+      clock.seek(0);
       setCaptureRequested(true);
-    }, 500);
+    }, 1200);
     return () => window.clearTimeout(handle);
   }, [code, compileStatus.kind, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -41,9 +41,15 @@ function ExampleViewer() {
   useEffect(() => {
     if (!clock || !ready) return;
     const h = setTimeout(() => {
-      clock.seek(example!.duration * 0.15);
+      clock.seek(0);
+    }, 200);
+    const h2 = setTimeout(() => {
       setCaptureRequested(true);
-    }, 400);
+    }, 1200);
+    return () => {
+      clearTimeout(h);
+      clearTimeout(h2);
+    };
     return () => clearTimeout(h);
   }, [clock, ready, example]);
 
