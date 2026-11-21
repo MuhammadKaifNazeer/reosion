@@ -1,56 +1,21 @@
 "use client";
 
-import Link from "next/link";
-
-
-import { Button } from "@/components/ui/button";
 import { ExamplesGrid } from "@/components/examples/examples-grid";
+import { LandingNavbar } from "@/components/landing/navbar";
+import { LandingFooter } from "@/components/landing/footer";
 
 export default function ExamplesPage() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
-          <Link href="/" className="flex items-center gap-2 text-foreground">
-            <span className="font-semibold tracking-tight">Reosion</span>
-          </Link>
-          <nav className="ml-4 hidden items-center gap-5 text-sm text-muted-foreground md:flex">
-            <Link className="transition-colors hover:text-foreground" href="/examples">
-              Examples
-            </Link>
-            <a className="transition-colors hover:text-foreground" href="/#features">
-              Features
-            </a>
-            <a className="transition-colors hover:text-foreground" href="/#local-first">
-              Local-first
-            </a>
-            <a className="transition-colors hover:text-foreground" href="/#ai">
-              AI
-            </a>
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              render={
-                <a href="https://github.com/MuhammadKaifNazeer/reosion" target="_blank" rel="noreferrer" />
-              }
-            >
-              GitHub
-            </Button>
-            <Button size="sm" render={<Link href="/dashboard" />}>
-              Start creating
-            </Button>
-          </div>
-        </div>
-      </header>
+      <LandingNavbar />
       <main className="mx-auto max-w-6xl px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-tight">Examples</h1>
-        <p className="mt-2 max-w-xl text-muted-foreground">
+        <p className="my-2 max-w-xl text-muted-foreground">
           Six animations you can open, remix and make your own.
         </p>
         <ExamplesGrid />
       </main>
+      <LandingFooter />
     </div>
   );
 }
