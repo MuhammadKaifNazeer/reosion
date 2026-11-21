@@ -26,7 +26,7 @@ export function ExamplesGrid({ limit }: { limit?: number }) {
 
   return (
     <>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((ex) => (
           <ExampleCard key={ex.slug} example={ex} thumbnail={thumbs[ex.slug] ?? null} />
         ))}

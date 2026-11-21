@@ -14,8 +14,8 @@ export default function LandingPage() {
       <LandingNavbar />
       <main>
         <LandingHero />
-        <LandingExamples />
         <LandingFlow />
+        <LandingExamples />
         <LandingFeatures />
         <LandingLocalFirst />
         <LandingAI />
