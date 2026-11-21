@@ -20,7 +20,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DEFAULT_CODE } from "@/lib/projects/templates";
+const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
+
+/**
+ * Short teaser shown on the landing page. The real default project file is
+ * longer; the hero only needs enough code to communicate the idea without
+ * stretching the demo row.
+ */
+const DEMO_CODE = `import { motion } from "framer-motion";
+import { useTime } from "@reosion/runtime";
+
+export default function Animation() {
+  const t = useTime();
+
+  return (
+    <main className="stage">
+      <motion.h1
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      >
+        Motion, in React.
+      </motion.h1>
+
+      <div
+        className="bar"
+        style={{ width: 80 + Math.sin(t * Math.PI) * 120 }}
+      />
+    </main>
+  );
+}`;
 
 const FLOW_STEPS = [
   { icon: FileCode2, label: "Code", detail: "Animation.tsx" },
@@ -102,7 +131,7 @@ export default function LandingPage() {
             <Button
               variant="ghost"
               render={
-                <a href="https://github.com" target="_blank" rel="noreferrer" />
+                <a href={REPO_URL} target="_blank" rel="noreferrer" />
               }
             >
               <GithubMark />
@@ -144,7 +173,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 render={
-                  <a href="https://github.com" target="_blank" rel="noreferrer" />
+                  <a href={REPO_URL} target="_blank" rel="noreferrer" />
                 }
               >
                 <GithubMark />
@@ -153,44 +182,96 @@ export default function LandingPage() {
             </div>
 
             {/* Code -> Motion demonstration */}
-            <div className="mt-16 grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-[1fr_20px_1fr]">
-              <div className="min-w-0 border-border p-4 md:border-r">
-                <div className="mb-3 flex items-center gap-1.5">
+            <div className="mt-16 grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-[1fr_24px_1fr]">
+              <div className="flex min-w-0 flex-col border-b border-border md:h-[360px] md:border-b-0 md:border-r">
+                <div className="flex items-center gap-1.5 border-b border-border/60 px-4 py-2.5">
                   <span className="size-2 rounded-full bg-muted" />
                   <span className="size-2 rounded-full bg-muted" />
                   <span className="size-2 rounded-full bg-muted" />
                   <span className="ml-2 font-mono text-xs text-muted-foreground">
                     Animation.tsx
                   </span>
+                  <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    tsx
+                  </span>
                 </div>
-                <pre className="overflow-x-auto font-mono text-xs leading-6 text-muted-foreground">
-                  <code>{DEFAULT_CODE}</code>
+                <pre className="h-[220px] overflow-auto p-4 font-mono text-xs leading-6 text-muted-foreground md:h-auto md:flex-1">
+                  <code>{DEMO_CODE}</code>
                 </pre>
               </div>
               <div className="hidden items-center justify-center md:flex">
                 <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
               </div>
-              <div className="relative bg-[#0a0a0b]">
-                <div className="absolute inset-x-0 top-4 mx-auto h-[calc(100%-4rem)] w-[min(360px,80%)] rounded-md border border-border/60 bg-background/40 p-6">
+              <div className="reosion-demo relative flex h-[320px] items-center justify-center overflow-hidden bg-[#0a0a0b] p-5 md:h-[360px]">
+                <div className="relative h-full w-full max-w-[390px] overflow-hidden rounded-md border border-border/60 bg-background/40">
                   <div
-                    className="absolute left-8 right-8 top-1/2 -translate-y-1/2"
-                    style={{ animation: "reosion-loop-x 4s ease-in-out infinite" }}
-                  >
-                    <div
-                      className="h-10 rounded-md"
+                    aria-hidden
+                    className="absolute inset-0 opacity-40"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 1px, transparent 0)",
+                      backgroundSize: "16px 16px",
+                    }}
+                  />
+                  <div className="relative flex h-full flex-col items-center justify-center px-6 pb-8 text-center">
+                    <span className="mb-5 inline-flex items-center gap-1.5 rounded-sm border border-border/60 bg-background/80 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <span
+                        className="size-1.5 rounded-full bg-brand"
+                        style={{
+                          animation: "reosion-demo-pulse 3s ease-in-out infinite",
+                        }}
+                      />
+                      Live preview
+                    </span>
+                    <p
+                      className="text-2xl font-semibold tracking-tight text-foreground"
                       style={{
-                        background:
-                          "linear-gradient(90deg, var(--brand), #a78bfa)",
-                        animation: "reosion-loop-scale 4s ease-in-out infinite",
+                        animation:
+                          "reosion-demo-title 6s cubic-bezier(0.16, 1, 0.3, 1) infinite",
+                      }}
+                    >
+                      Motion, in React.
+                    </p>
+                    <div className="mt-3 h-[3px] w-24 overflow-hidden rounded-full bg-muted/40">
+                      <div
+                        className="h-full w-full origin-left rounded-full"
+                        style={{
+                          background:
+                            "linear-gradient(90deg, var(--brand), #a78bfa)",
+                          animation:
+                            "reosion-demo-underline 6s cubic-bezier(0.16, 1, 0.3, 1) infinite",
+                        }}
+                      />
+                    </div>
+                    <div className="relative mt-8 h-1 w-44 rounded-full bg-muted/30">
+                      <div
+                        className="absolute size-2.5 rounded-full bg-brand"
+                        style={{
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          boxShadow: "0 0 12px var(--brand)",
+                          animation:
+                            "reosion-demo-dot 6s cubic-bezier(0.65, 0, 0.35, 1) infinite",
+                        }}
+                      />
+                    </div>
+                    <p
+                      className="mt-4 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                      style={{
+                        animation: "reosion-demo-caption 6s linear infinite",
+                      }}
+                    >
+                      1920 × 1080 · 30fps · mp4
+                    </p>
+                  </div>
+                  <div className="absolute inset-x-4 bottom-3 h-0.5 overflow-hidden rounded-full bg-muted/20">
+                    <div
+                      className="h-full w-full origin-left rounded-full bg-brand/70"
+                      style={{
+                        animation: "reosion-demo-progress 6s linear infinite",
                       }}
                     />
                   </div>
-                  <p
-                    className="absolute bottom-6 left-8 right-8 rounded-md border border-border/40 bg-background p-3 text-center text-xs text-muted-foreground"
-                    style={{ animation: "reosion-loop-opacity 4s linear infinite" }}
-                  >
-                    Output · 1920 × 1080 · 30fps
-                  </p>
                 </div>
               </div>
             </div>
@@ -357,7 +438,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 render={
-                  <a href="https://github.com" target="_blank" rel="noreferrer" />
+                  <a href={REPO_URL} target="_blank" rel="noreferrer" />
                 }
               >
                 <GithubMark />

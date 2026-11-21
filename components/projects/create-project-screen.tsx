@@ -35,7 +35,7 @@ export function CreateProjectScreen() {
   const [ratio, setRatio] = useState<AspectRatio>("16:9");
   const [customWidth, setCustomWidth] = useState("1920");
   const [customHeight, setCustomHeight] = useState("1080");
-  const [duration, setDuration] = useState("3");
+  const [duration, setDuration] = useState("30");
   const [creating, setCreating] = useState(false);
 
   const previewDimensions = useMemo(() => {
@@ -52,7 +52,7 @@ export function CreateProjectScreen() {
         width: previewDimensions.width,
         height: previewDimensions.height,
         fps: 30,
-        duration: Math.max(1, Number.parseFloat(duration) || 3),
+        duration: Math.max(1, Number.parseFloat(duration) || 30),
       };
       const project = await getStorage().createProject({
         name: name.trim() || "Untitled Animation",

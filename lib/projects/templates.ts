@@ -20,9 +20,11 @@ export default function Animation() {
   const t = useTime();
 
   // Deterministic: everything derives from \`t\`, the clock time in seconds.
+  // The loop keeps the default 30s timeline alive after the intro animation.
+  const pulse = Math.sin(t * 2) ** 2;
   const accent = {
     width: 120 + Math.sin(t * Math.PI) * 60,
-    opacity: Math.min(1, t * 2),
+    opacity: 0.55 + 0.45 * pulse,
   };
 
   return (
@@ -64,8 +66,7 @@ export default function Animation() {
       />
       <motion.p
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.6 }}
+        animate={{ opacity: 0.6 + 0.4 * pulse }}
         style={{ color: "#a1a1aa", fontSize: 24 }}
       >
         Written in React. Exported locally.
@@ -101,7 +102,7 @@ export default function Animation() {
 
 /**
  * Default project settings per aspect ratio when the user picks a preset.
- * Duration is 3s everywhere; fps 30.
+ * Duration is 30s everywhere; fps 30.
  */
 export function defaultSettingsFor(
   aspectRatio: "16:9" | "1:1" | "9:16" | "4:5" | "custom",
@@ -113,7 +114,7 @@ export function defaultSettingsFor(
     width: width ?? 1920,
     height: height ?? 1080,
     fps: 30,
-    duration: 3,
+    duration: 30,
   };
 }
 
