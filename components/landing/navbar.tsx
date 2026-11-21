@@ -5,6 +5,7 @@ import { Logo, Wordmark } from "@/components/app-shell/logo";
 import { GithubMark } from "@/components/app-shell/github-mark";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LandingThemeToggle } from "@/components/landing/theme-toggle";
 
 const REPO_URL = "https://github.com/MuhammadKaifNazeer/reosion";
 
@@ -34,6 +35,7 @@ export function LandingNavbar() {
           </a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <LandingThemeToggle />
           <Button
             variant="ghost"
             render={
